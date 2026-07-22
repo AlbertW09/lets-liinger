@@ -1,4 +1,3 @@
-
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/constants/theme';
 import { useState } from 'react';
