@@ -1,6 +1,8 @@
+
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/constants/theme';
 import { useState } from 'react';
+
 import {
   Image,
   ScrollView,
@@ -51,6 +53,8 @@ export default function HomeScreen() {
       upvotes: 88,
     }
   ]);
+
+
 
   const toggleRSVP = (eventId: string) => {
     setRsvps(prev => ({ ...prev, [eventId]: !prev[eventId] }));
@@ -307,3 +311,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   }
 });
+
+
+
