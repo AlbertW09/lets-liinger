@@ -1,5 +1,5 @@
 import { Text } from 'react-native';
 
 export default function MapPage() {
-  return <Text>Map page</Text>;
+  return <Text>Map page placeholder</Text>;
 }
