@@ -48,3 +48,4 @@ example
 .claude/
 AGENTS.md
 CLAUDE.md
+.env
