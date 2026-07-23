@@ -1,19 +1,60 @@
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/constants/theme';
-import { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
-    useColorScheme
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+  useColorScheme
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../../supabaseClient';
 
 export default function ProfileScreen() {
   const systemScheme = useColorScheme();
   const scheme = systemScheme === 'unspecified' ? 'light' : systemScheme;
   const colors = Colors[scheme];
+  const router = useRouter();
+
+  const [profile, setProfile] = useState<{
+    display_name: string;
+    username: string;
+    bio: string;
+    interests: string[];
+  } | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+
+      async function fetchProfile() {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          if (!cancelled) setLoadingProfile(false);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('display_name, username, bio, interests')
+          .eq('id', user.id)
+          .single();
+
+        if (cancelled) return;
+        if (!error) {
+          setProfile(data);
+        }
+        setLoadingProfile(false);
+      }
+
+      fetchProfile();
+      return () => { cancelled = true; };
+    }, [])
+  );
 
   const [clubs, setClubs] = useState([
     { id: '1', name: '🎸 Music Collective', role: 'Member', color: colors.accentPink },
@@ -153,6 +194,16 @@ export default function ProfileScreen() {
     }
   });
 
+  if (loadingProfile) {
+    return (
+      <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={colors.text} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -170,18 +221,32 @@ export default function ProfileScreen() {
               
             </View>
 
-            <ThemedText style={styles.userName}>ALEX RIVERA</ThemedText>
+            <ThemedText style={styles.userName}>
+              {(profile?.display_name || 'New Student').toUpperCase()}
+            </ThemedText>
             
             <View style={dynamicStyles.handleBadge}>
-              <ThemedText style={styles.handleText}>@alex_y2k</ThemedText>
+              <ThemedText style={styles.handleText}>
+                @{profile?.username || 'username'}
+              </ThemedText>
             </View>
 
             <ThemedText style={styles.bioText}>
-              Senior @ Campus | Music & Retro Gaming Enthusiast 👾🎸
+              {profile?.bio || 'No bio yet.'}
             </ThemedText>
 
+            {!!profile?.interests?.length && (
+              <View style={styles.interestsWrap}>
+                {profile.interests.map((tag) => (
+                  <View key={tag} style={[styles.interestChip, { borderColor: colors.border }]}>
+                    <ThemedText style={styles.interestChipText}>{tag}</ThemedText>
+                  </View>
+                ))}
+              </View>
+            )}
+
             <View style={dynamicStyles.editBtnShadow}>
-              <TouchableOpacity style={dynamicStyles.editBtn}>
+              <TouchableOpacity style={dynamicStyles.editBtn} onPress={() => router.push('/edit-profile')}>
                 <ThemedText style={styles.boldBtnText}>EDIT PROFILE</ThemedText>
               </TouchableOpacity>
             </View>
@@ -252,6 +317,11 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
     paddingBottom: 130,
   },
+  loadingWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -282,6 +352,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.8,
     marginVertical: Spacing.one,
+  },
+  interestsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: Spacing.one,
+    marginBottom: Spacing.one,
+  },
+  interestChip: {
+    borderWidth: 1.5,
+    borderRadius: 999,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 3,
+  },
+  interestChipText: {
+    fontSize: 10,
+    fontWeight: '800',
   },
   boldBtnText: {
     fontWeight: '900',

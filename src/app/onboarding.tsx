@@ -69,8 +69,20 @@ export default function OnboardingScreen() {
       return;
     }
 
+    // Mirror the flag onto the auth user so the session carries it.
+    // This fires an auth-state-change event, which the root layout listens for.
+    const { error: metaError } = await supabase.auth.updateUser({
+      data: { onboarded: true },
+    });
+
+    if (metaError) {
+      setErrorMsg(metaError.message);
+      setSaving(false);
+      return;
+    }
+
     setSaving(false);
-    router.replace('/(tabs)');
+ 
   }
 
   return (
@@ -182,5 +194,5 @@ const styles = StyleSheet.create({
   buttonText: {
     textAlign: 'center', fontWeight: '900', color: '#000', fontSize: 16,
   },
-  error: { color: '#ff6b6b', marginTop: 16, textAlign: 'center' },
-});
+error: { color: '#ff6b6b', marginTop: 16, textAlign: 'center' },
+   });
