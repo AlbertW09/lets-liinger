@@ -24,6 +24,7 @@ export default function ProfileScreen() {
     username: string;
     bio: string;
     interests: string[];
+    extracurriculars: { name: string; role: string }[];
   } | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
@@ -40,7 +41,7 @@ export default function ProfileScreen() {
 
         const { data, error } = await supabase
           .from('profiles')
-          .select('display_name, username, bio, interests')
+          .select('display_name, username, bio, interests, extracurriculars')
           .eq('id', user.id)
           .single();
 
@@ -56,11 +57,7 @@ export default function ProfileScreen() {
     }, [])
   );
 
-  const [clubs, setClubs] = useState([
-    { id: '1', name: '🎸 Music Collective', role: 'Member', color: colors.accentPink },
-    { id: '2', name: '🕹️ Esports Club', role: 'Officer', color: colors.accentCyan },
-    { id: '3', name: '🍕 Student Union', role: 'Member', color: colors.accentYellow },
-  ]);
+  const clubColors = [colors.accentPink, colors.accentCyan, colors.accentYellow, colors.accentGreen];
 
   const [savedEvents] = useState([
     {
@@ -263,7 +260,7 @@ export default function ProfileScreen() {
 
           <View style={dynamicStyles.statBoxShadow}>
             <View style={dynamicStyles.statBox}>
-              <ThemedText style={styles.statNumber}>3</ThemedText>
+              <ThemedText style={styles.statNumber}>{profile?.extracurriculars?.length ?? 0}</ThemedText>
               <ThemedText style={styles.statLabel}>CLUBS</ThemedText>
             </View>
           </View>
@@ -280,9 +277,15 @@ export default function ProfileScreen() {
           <ThemedText style={styles.sectionTitle}>🏷️ MY CLUBS</ThemedText>
         </View>
 
-        {clubs.map((club) => (
-          <View key={club.id} style={dynamicStyles.clubTagShadow}>
-            <View style={[dynamicStyles.clubTag, { backgroundColor: club.color }]}>
+        {!profile?.extracurriculars?.length && (
+          <ThemedText style={styles.emptyText} themeColor="textSecondary">
+            No extracurriculars added yet. Add some from Edit Profile.
+          </ThemedText>
+        )}
+
+        {profile?.extracurriculars?.map((club, index) => (
+          <View key={`${club.name}-${index}`} style={dynamicStyles.clubTagShadow}>
+            <View style={[dynamicStyles.clubTag, { backgroundColor: clubColors[index % clubColors.length] }]}>
               <ThemedText style={styles.clubNameText}>{club.name}</ThemedText>
               <View style={[styles.roleBadge, { borderColor: colors.border }]}>
                 <ThemedText style={styles.roleText}>{club.role}</ThemedText>
@@ -398,6 +401,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontSize: 16,
     letterSpacing: 0.5,
+  },
+  emptyText: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: Spacing.two,
   },
   clubNameText: {
     fontSize: 14,

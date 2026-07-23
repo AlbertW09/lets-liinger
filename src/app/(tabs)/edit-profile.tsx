@@ -25,6 +25,9 @@ export default function EditProfileScreen() {
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
   const [interests, setInterests] = useState<string[]>([]);
+  const [extracurriculars, setExtracurriculars] = useState<{ name: string; role: string }[]>([]);
+  const [newClubName, setNewClubName] = useState('');
+  const [newClubRole, setNewClubRole] = useState('');
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -38,7 +41,7 @@ export default function EditProfileScreen() {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('display_name, username, bio, interests')
+        .select('display_name, username, bio, interests, extracurriculars')
         .eq('id', user.id)
         .single();
 
@@ -47,6 +50,7 @@ export default function EditProfileScreen() {
         setUsername(data.username ?? '');
         setBio(data.bio ?? '');
         setInterests(data.interests ?? []);
+        setExtracurriculars(data.extracurriculars ?? []);
       }
       setLoadingProfile(false);
     }
@@ -58,6 +62,17 @@ export default function EditProfileScreen() {
     setInterests(prev =>
       prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
     );
+  }
+
+  function addExtracurricular() {
+    if (!newClubName.trim() || !newClubRole.trim()) return;
+    setExtracurriculars(prev => [...prev, { name: newClubName.trim(), role: newClubRole.trim() }]);
+    setNewClubName('');
+    setNewClubRole('');
+  }
+
+  function removeExtracurricular(index: number) {
+    setExtracurriculars(prev => prev.filter((_, i) => i !== index));
   }
 
   async function handleSave() {
@@ -88,6 +103,7 @@ export default function EditProfileScreen() {
         username: username.trim().toLowerCase().replace(/\s+/g, '_'),
         bio: bio.trim(),
         interests,
+        extracurriculars,
       })
       .eq('id', user.id);
 
@@ -126,6 +142,15 @@ export default function EditProfileScreen() {
       borderWidth: 2, borderColor: colors.border, backgroundColor: colors.backgroundElement,
     },
     chipSelected: { backgroundColor: colors.accentPink },
+    clubRow: {
+      backgroundColor: colors.backgroundElement, borderWidth: 2, borderColor: colors.border,
+      borderRadius: 12,
+    },
+    removeText: { color: colors.accentPink, fontWeight: '900', fontSize: 16 },
+    addBtn: {
+      backgroundColor: colors.backgroundElement, borderWidth: 2, borderColor: colors.border,
+      borderRadius: 12, paddingVertical: Spacing.two, alignItems: 'center', marginTop: Spacing.two,
+    },
     saveBtnShadow: { backgroundColor: colors.border, borderRadius: 14, marginTop: Spacing.four },
     saveBtn: {
       backgroundColor: colors.accentYellow, borderWidth: 2, borderColor: colors.border,
@@ -205,6 +230,38 @@ export default function EditProfileScreen() {
           })}
         </View>
 
+        <ThemedText style={dynamicStyles.label}>Extracurriculars</ThemedText>
+        {extracurriculars.map((item, index) => (
+          <View key={`${item.name}-${index}`} style={[dynamicStyles.clubRow, styles.clubRow]}>
+            <ThemedText style={styles.clubRowText}>
+              {item.name} <ThemedText style={styles.clubRowRole} themeColor="textSecondary">— {item.role}</ThemedText>
+            </ThemedText>
+            <TouchableOpacity onPress={() => removeExtracurricular(index)}>
+              <ThemedText style={dynamicStyles.removeText}>✕</ThemedText>
+            </TouchableOpacity>
+          </View>
+        ))}
+
+        <View style={styles.addClubRow}>
+          <TextInput
+            style={[dynamicStyles.input, styles.addClubNameInput]}
+            placeholder="Club or activity"
+            placeholderTextColor={colors.textSecondary}
+            value={newClubName}
+            onChangeText={setNewClubName}
+          />
+          <TextInput
+            style={[dynamicStyles.input, styles.addClubRoleInput]}
+            placeholder="Your role"
+            placeholderTextColor={colors.textSecondary}
+            value={newClubRole}
+            onChangeText={setNewClubRole}
+          />
+        </View>
+        <TouchableOpacity style={dynamicStyles.addBtn} onPress={addExtracurricular}>
+          <ThemedText style={styles.addBtnText}>+ ADD</ThemedText>
+        </TouchableOpacity>
+
         {errorMsg ? <ThemedText style={styles.error}>{errorMsg}</ThemedText> : null}
 
         <View style={dynamicStyles.saveBtnShadow}>
@@ -229,6 +286,16 @@ const styles = StyleSheet.create({
   counter: { fontSize: 11, opacity: 0.6, textAlign: 'right', marginTop: Spacing.one },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   chipText: { fontWeight: 'bold', fontSize: 13 },
+  clubRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, marginBottom: Spacing.two,
+  },
+  clubRowText: { fontWeight: '900', fontSize: 14 },
+  clubRowRole: { fontWeight: '600', fontSize: 13 },
+  addClubRow: { flexDirection: 'row', gap: Spacing.two },
+  addClubNameInput: { flex: 3 },
+  addClubRoleInput: { flex: 2 },
+  addBtnText: { fontWeight: '900', fontSize: 13, letterSpacing: 0.5 },
   saveBtnText: { textAlign: 'center', fontWeight: '900', color: '#000', fontSize: 16 },
   error: { color: '#ff6b6b', marginTop: Spacing.three, textAlign: 'center' },
 });
