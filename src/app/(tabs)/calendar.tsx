@@ -1,6 +1,7 @@
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/constants/theme';
-import { useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
     ScrollView,
     StyleSheet,
@@ -9,6 +10,7 @@ import {
     useColorScheme
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../../supabaseClient';
 
 interface CalendarEvent {
   id: string;
@@ -31,44 +33,50 @@ export default function CalendarScreen() {
     `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   );
 
-  const [scheduledEvents] = useState<CalendarEvent[]>([
-    {
-      id: '1',
-      date: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`,
-      title: 'HOUSE PARTY & INDIE JAM',
-      time: '8:00 PM',
-      location: 'STUDENT PLAZA',
-      host: '🎸 MUSIC COLLECTIVE',
-      color: colors.accentPink,
-    },
-    {
-      id: '2',
-      date: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`,
-      title: 'Y2K DANCE BASH',
-      time: '10:30 PM',
-      location: 'CAMPUS CENTER',
-      host: '💃 DANCE CLUB',
-      color: colors.accentYellow,
-    },
-    {
-      id: '3',
-      date: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(Math.min(today.getDate() + 2, 28)).padStart(2, '0')}`,
-      title: 'RETRO GAMING TOURNAMENT',
-      time: '6:30 PM',
-      location: 'SUTTER ROOM 102',
-      host: '🕹️ ESPORTS CLUB',
-      color: colors.accentCyan,
-    },
-    {
-      id: '4',
-      date: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(Math.min(today.getDate() + 5, 28)).padStart(2, '0')}`,
-      title: 'FREE SLICE IN THE QUAD',
-      time: '12:00 PM',
-      location: 'THE QUAD',
-      host: '🍕 STUDENT UNION',
-      color: colors.accentGreen,
-    }
-  ]);
+  const [scheduledEvents, setScheduledEvents] = useState<CalendarEvent[]>([]);
+
+  const accents = [colors.accentPink, colors.accentCyan, colors.accentYellow, colors.accentGreen];
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const { data } = await supabase
+          .from('events')
+          .select('id, title, event_time, location, creator:profiles!events_created_by_fkey(username, display_name)')
+          .order('event_time', { ascending: true });
+
+        if (cancelled) return;
+
+        const mapped: CalendarEvent[] = (data ?? []).map((e: any, idx: number) => {
+          const iso: string = e.event_time ?? '';
+          const datePart = iso.slice(0, 10);
+          const host = e.creator?.username
+            ? `@${e.creator.username}`
+            : e.creator?.display_name ?? 'Someone';
+          let time = 'All day';
+          if (iso.includes('T') && !iso.endsWith('T00:00:00')) {
+            const d = new Date(iso);
+            if (!isNaN(d.getTime())) {
+              time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+            }
+          }
+          return {
+            id: e.id,
+            date: datePart,
+            title: e.title,
+            time,
+            location: e.location ?? 'TBD',
+            host,
+            color: accents[idx % accents.length],
+          };
+        });
+
+        setScheduledEvents(mapped);
+      })();
+      return () => { cancelled = true; };
+    }, [])
+  );
 
   const monthNames = [
     'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',

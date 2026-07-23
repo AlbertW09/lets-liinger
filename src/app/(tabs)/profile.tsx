@@ -27,6 +27,12 @@ export default function ProfileScreen() {
     extracurriculars: { name: string; role: string }[];
   } | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [savedEvents, setSavedEvents] = useState<{
+    id: string;
+    title: string;
+    host: string;
+    location: string;
+  }[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -39,16 +45,35 @@ export default function ProfileScreen() {
           return;
         }
 
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('display_name, username, bio, interests, extracurriculars')
-          .eq('id', user.id)
-          .single();
+        const [profileRes, rsvpRes] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('display_name, username, bio, interests, extracurriculars')
+            .eq('id', user.id)
+            .single(),
+          supabase
+            .from('rsvps')
+            .select('event:events!rsvps_event_id_fkey(id, title, location, creator:profiles!events_created_by_fkey(username, display_name))')
+            .eq('user_id', user.id),
+        ]);
 
         if (cancelled) return;
-        if (!error) {
-          setProfile(data);
+
+        if (!profileRes.error) {
+          setProfile(profileRes.data);
         }
+
+        const rsvped = (rsvpRes.data ?? [])
+          .map((r: any) => r.event)
+          .filter(Boolean)
+          .map((e: any) => ({
+            id: e.id,
+            title: e.title,
+            location: e.location ?? 'TBD',
+            host: e.creator?.username ? `@${e.creator.username}` : e.creator?.display_name ?? 'Someone',
+          }));
+        setSavedEvents(rsvped);
+
         setLoadingProfile(false);
       }
 
@@ -58,16 +83,6 @@ export default function ProfileScreen() {
   );
 
   const clubColors = [colors.accentPink, colors.accentCyan, colors.accentYellow, colors.accentGreen];
-
-  const [savedEvents] = useState([
-    {
-      id: '1',
-      title: 'HOUSE PARTY & INDIE JAM',
-      host: '🎸 MUSIC COLLECTIVE',
-      location: 'STUDENT PLAZA',
-      status: 'RSVP\'D',
-    }
-  ]);
 
   const dynamicStyles = StyleSheet.create({
     safeArea: {
@@ -253,7 +268,7 @@ export default function ProfileScreen() {
         <View style={styles.statsRow}>
           <View style={dynamicStyles.statBoxShadow}>
             <View style={dynamicStyles.statBox}>
-              <ThemedText style={styles.statNumber}>12</ThemedText>
+              <ThemedText style={styles.statNumber}>{savedEvents.length}</ThemedText>
               <ThemedText style={styles.statLabel}>RSVPS</ThemedText>
             </View>
           </View>
@@ -298,16 +313,27 @@ export default function ProfileScreen() {
           <ThemedText style={styles.sectionTitle}>⚡️ MY ACTIVITY</ThemedText>
         </View>
 
+        {savedEvents.length === 0 && (
+          <ThemedText style={styles.emptyText} themeColor="textSecondary">
+            No RSVPs yet. RSVP to events from the home feed.
+          </ThemedText>
+        )}
+
         {savedEvents.map((event) => (
-          <View key={event.id} style={dynamicStyles.eventCardShadow}>
+          <TouchableOpacity
+            key={event.id}
+            style={dynamicStyles.eventCardShadow}
+            activeOpacity={0.9}
+            onPress={() => router.push(`/event-detail?id=${event.id}`)}
+          >
             <View style={dynamicStyles.eventCard}>
               <View style={dynamicStyles.statusBadge}>
-                <ThemedText style={styles.statusText}>{event.status}</ThemedText>
+                <ThemedText style={styles.statusText}>RSVP'D</ThemedText>
               </View>
               <ThemedText style={styles.eventTitle}>{event.title}</ThemedText>
               <ThemedText style={styles.eventMeta}>Hosted by {event.host} • 📍 {event.location}</ThemedText>
             </View>
-          </View>
+          </TouchableOpacity>
         ))}
 
       </ScrollView>
