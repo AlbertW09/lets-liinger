@@ -1,7 +1,7 @@
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/constants/theme';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../supabaseClient';
+import { addClub, Club, clubLabel, fetchClubs } from '../../lib/clubs';
 
 type SortMode = 'popular' | 'recent' | 'nearby';
 
@@ -32,12 +33,54 @@ interface EnrichedEvent {
   longitude: number | null;
   created_at: string;
   hostName: string;
+  postedBy: string;
   likeCount: number;
   likedByMe: boolean;
   rsvpCount: number;
   rsvpers: string[];
   rsvpedByMe: boolean;
   distance: number | null;
+}
+
+interface PlaceResult {
+  name: string;
+  lat: number;
+  lng: number;
+}
+
+// Geocode against OpenStreetMap's Nominatim so the location is always a real map place.
+async function searchPlaces(query: string): Promise<PlaceResult[]> {
+  if (typeof fetch === 'undefined') return [];
+  const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&q=${encodeURIComponent(query)}`;
+  try {
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    const data = await res.json();
+    return (data ?? []).map((d: any) => ({
+      name: d.name && d.name.trim()
+        ? `${d.name}${d.address?.city || d.address?.town ? `, ${d.address.city ?? d.address.town}` : ''}`
+        : String(d.display_name).split(',').slice(0, 2).join(',').trim(),
+      lat: parseFloat(d.lat),
+      lng: parseFloat(d.lon),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// "Posted 3h ago" style relative label.
+function formatPosted(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso.includes('T') ? iso : iso.replace(' ', 'T'));
+  if (isNaN(d.getTime())) return '';
+  const diff = Date.now() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 // Haversine distance in km between two coordinates.
@@ -85,12 +128,24 @@ export default function HomeScreen() {
   const [createVisible, setCreateVisible] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [locationText, setLocationText] = useState('');
   const [dateStr, setDateStr] = useState('');
   const [timeStr, setTimeStr] = useState('');
-  const [eventCoords, setEventCoords] = useState<Coords | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+
+  // Location place-picker (Nominatim)
+  const [placeQuery, setPlaceQuery] = useState('');
+  const [placeResults, setPlaceResults] = useState<PlaceResult[]>([]);
+  const [placeSelected, setPlaceSelected] = useState<PlaceResult | null>(null);
+  const [searchingPlace, setSearchingPlace] = useState(false);
+  const placeTimer = useRef<any>(null);
+
+  // Hosting club (from the shared clubs list)
+  const [host, setHost] = useState('');
+  const [clubs, setClubs] = useState<Club[]>([]);
+  const [addingClub, setAddingClub] = useState(false);
+  const [newClubName, setNewClubName] = useState('');
+  const [newClubEmoji, setNewClubEmoji] = useState('');
 
   const fetchAll = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -99,7 +154,7 @@ export default function HomeScreen() {
     const [eventsRes, likesRes, rsvpsRes] = await Promise.all([
       supabase
         .from('events')
-        .select('id, title, description, location, event_time, latitude, longitude, created_at, creator:profiles!events_created_by_fkey(username, display_name)'),
+        .select('id, title, description, location, event_time, latitude, longitude, created_at, host, creator:profiles!events_created_by_fkey(username, display_name)'),
       supabase.from('event_likes').select('event_id, user_id'),
       supabase
         .from('rsvps')
@@ -124,9 +179,12 @@ export default function HomeScreen() {
         latitude: e.latitude,
         longitude: e.longitude,
         created_at: e.created_at,
-        hostName: e.creator?.username
-          ? `@${e.creator.username}`
-          : e.creator?.display_name ?? 'Someone',
+        hostName: e.host?.trim()
+          ? e.host
+          : e.creator?.username
+            ? `@${e.creator.username}`
+            : e.creator?.display_name ?? 'Someone',
+        postedBy: e.creator?.username ? `@${e.creator.username}` : e.creator?.display_name ?? 'someone',
         likeCount: eventLikes.length,
         likedByMe: !!user && eventLikes.some((l) => l.user_id === user.id),
         rsvpCount: eventRsvps.length,
@@ -172,9 +230,47 @@ export default function HomeScreen() {
     fetchAll();
   }
 
-  async function useMyLocationForEvent() {
-    const coords = await getCurrentCoords();
-    if (coords) setEventCoords(coords);
+  async function openCreate() {
+    setCreateVisible(true);
+    setClubs(await fetchClubs());
+  }
+
+  async function handleAddClub() {
+    const created = await addClub(newClubName, newClubEmoji);
+    if (created) {
+      setClubs((prev) =>
+        prev.some((c) => c.id === created.id)
+          ? prev
+          : [...prev, created].sort((a, b) => a.name.localeCompare(b.name))
+      );
+      setHost(clubLabel(created));
+      setNewClubName('');
+      setNewClubEmoji('');
+      setAddingClub(false);
+    }
+  }
+
+  function onPlaceQueryChange(text: string) {
+    setPlaceQuery(text);
+    setPlaceSelected(null); // editing invalidates a prior selection
+    if (placeTimer.current) clearTimeout(placeTimer.current);
+    if (text.trim().length < 3) {
+      setPlaceResults([]);
+      setSearchingPlace(false);
+      return;
+    }
+    setSearchingPlace(true);
+    placeTimer.current = setTimeout(async () => {
+      const results = await searchPlaces(text.trim());
+      setPlaceResults(results);
+      setSearchingPlace(false);
+    }, 450);
+  }
+
+  function pickPlace(p: PlaceResult) {
+    setPlaceSelected(p);
+    setPlaceQuery(p.name);
+    setPlaceResults([]);
   }
 
   async function enableNearby() {
@@ -189,10 +285,15 @@ export default function HomeScreen() {
   function resetForm() {
     setTitle('');
     setDescription('');
-    setLocationText('');
     setDateStr('');
     setTimeStr('');
-    setEventCoords(null);
+    setPlaceQuery('');
+    setPlaceResults([]);
+    setPlaceSelected(null);
+    setHost('');
+    setAddingClub(false);
+    setNewClubName('');
+    setNewClubEmoji('');
     setFormError('');
   }
 
@@ -210,6 +311,10 @@ export default function HomeScreen() {
       setFormError('Enter time as HH:MM (24h), or leave it blank.');
       return;
     }
+    if (!placeSelected) {
+      setFormError('Pick a location from the search results.');
+      return;
+    }
 
     setSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -224,11 +329,12 @@ export default function HomeScreen() {
     const { error } = await supabase.from('events').insert({
       title: title.trim(),
       description: description.trim() || null,
-      location: locationText.trim() || null,
+      location: placeSelected.name,
       event_time: eventTime,
       created_by: user.id,
-      latitude: eventCoords?.lat ?? null,
-      longitude: eventCoords?.lng ?? null,
+      host: host.trim() || null,
+      latitude: placeSelected.lat,
+      longitude: placeSelected.lng,
     });
 
     setSaving(false);
@@ -321,10 +427,18 @@ export default function HomeScreen() {
       backgroundColor: colors.backgroundElement, color: colors.text, padding: Spacing.three,
       borderRadius: 12, borderWidth: 2, borderColor: colors.border, fontSize: 15,
     },
-    locBtn: {
-      backgroundColor: eventCoords ? colors.accentGreen : colors.backgroundElement,
+    placeList: {
       borderWidth: 2, borderColor: colors.border, borderRadius: 12,
-      paddingVertical: Spacing.two, alignItems: 'center', marginTop: Spacing.two,
+      marginTop: Spacing.two, backgroundColor: colors.backgroundElement, overflow: 'hidden',
+    },
+    hostChip: {
+      paddingVertical: Spacing.one, paddingHorizontal: Spacing.three, borderRadius: 999,
+      borderWidth: 2, borderColor: colors.border, backgroundColor: colors.backgroundElement,
+    },
+    hostChipSelected: { backgroundColor: colors.accentPink },
+    addClubBtn: {
+      backgroundColor: colors.accentCyan, borderWidth: 2, borderColor: colors.border,
+      borderRadius: 12, paddingHorizontal: Spacing.three, justifyContent: 'center', alignItems: 'center',
     },
     primaryBtnShadow: { backgroundColor: colors.border, borderRadius: 14, marginTop: Spacing.four },
     primaryBtn: {
@@ -366,7 +480,7 @@ export default function HomeScreen() {
         </View>
 
         <View style={dynamicStyles.createBtnShadow}>
-          <TouchableOpacity style={dynamicStyles.createBtn} onPress={() => setCreateVisible(true)}>
+          <TouchableOpacity style={dynamicStyles.createBtn} onPress={openCreate}>
             <ThemedText style={styles.boldText}>+ CREATE EVENT</ThemedText>
           </TouchableOpacity>
         </View>
@@ -467,9 +581,14 @@ export default function HomeScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <ThemedText style={styles.commentHint} themeColor="textSecondary">
-                  Tap to view & comment →
-                </ThemedText>
+                <View style={styles.cardFooter}>
+                  <ThemedText style={styles.postedText} themeColor="textSecondary">
+                    Posted {formatPosted(event.created_at)} by {event.postedBy}
+                  </ThemedText>
+                  <ThemedText style={styles.commentHint} themeColor="textSecondary">
+                    Tap to view & comment →
+                  </ThemedText>
+                </View>
               </TouchableOpacity>
             </View>
           ))
@@ -510,16 +629,78 @@ export default function HomeScreen() {
             <ThemedText style={dynamicStyles.label}>Location</ThemedText>
             <TextInput
               style={dynamicStyles.formInput}
-              placeholder="Student Plaza"
+              placeholder="Search a real place…"
               placeholderTextColor={colors.textSecondary}
-              value={locationText}
-              onChangeText={setLocationText}
+              value={placeQuery}
+              onChangeText={onPlaceQueryChange}
+              autoCapitalize="none"
             />
-            <TouchableOpacity style={dynamicStyles.locBtn} onPress={useMyLocationForEvent}>
-              <ThemedText style={styles.locBtnText}>
-                {eventCoords ? '✓ Location pinned' : '📍 Pin my current location (for “Nearby”)'}
+            {searchingPlace && (
+              <ThemedText style={styles.placeHint} themeColor="textSecondary">Searching…</ThemedText>
+            )}
+            {placeSelected && (
+              <ThemedText style={styles.placeHint} themeColor="textSecondary">
+                ✓ Pinned: {placeSelected.name}
               </ThemedText>
-            </TouchableOpacity>
+            )}
+            {placeResults.length > 0 && (
+              <View style={dynamicStyles.placeList}>
+                {placeResults.map((p, i) => (
+                  <TouchableOpacity
+                    key={`${p.lat}-${p.lng}-${i}`}
+                    style={[styles.placeRow, i < placeResults.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+                    onPress={() => pickPlace(p)}
+                  >
+                    <ThemedText style={styles.placeRowText}>📍 {p.name}</ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            <ThemedText style={dynamicStyles.label}>Hosting club (optional)</ThemedText>
+            <View style={styles.hostChipWrap}>
+              {clubs.map((c) => {
+                const label = clubLabel(c);
+                const selected = host === label;
+                return (
+                  <TouchableOpacity
+                    key={c.id}
+                    style={[dynamicStyles.hostChip, selected && dynamicStyles.hostChipSelected]}
+                    onPress={() => setHost(selected ? '' : label)}
+                  >
+                    <ThemedText style={styles.hostChipText}>{label}</ThemedText>
+                  </TouchableOpacity>
+                );
+              })}
+              <TouchableOpacity
+                style={[dynamicStyles.hostChip, styles.addClubChip]}
+                onPress={() => setAddingClub((v) => !v)}
+              >
+                <ThemedText style={styles.hostChipText}>➕ Add club</ThemedText>
+              </TouchableOpacity>
+            </View>
+            {addingClub && (
+              <View style={styles.addClubRow}>
+                <TextInput
+                  style={[dynamicStyles.formInput, styles.emojiInput]}
+                  placeholder="🎸"
+                  placeholderTextColor={colors.textSecondary}
+                  value={newClubEmoji}
+                  onChangeText={setNewClubEmoji}
+                  maxLength={2}
+                />
+                <TextInput
+                  style={[dynamicStyles.formInput, styles.clubNameInput]}
+                  placeholder="New club name"
+                  placeholderTextColor={colors.textSecondary}
+                  value={newClubName}
+                  onChangeText={setNewClubName}
+                />
+                <TouchableOpacity style={dynamicStyles.addClubBtn} onPress={handleAddClub}>
+                  <ThemedText style={styles.buttonText}>Add</ThemedText>
+                </TouchableOpacity>
+              </View>
+            )}
 
             <ThemedText style={dynamicStyles.label}>Date</ThemedText>
             <TextInput
@@ -600,7 +781,12 @@ const styles = StyleSheet.create({
   rsvpLine: { fontSize: 12, fontWeight: '700', marginTop: Spacing.one, marginBottom: Spacing.two },
   cardActions: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.two },
   buttonText: { fontWeight: '900', color: '#000', fontSize: 14 },
-  commentHint: { fontSize: 11, fontWeight: '700', textAlign: 'right', marginTop: Spacing.two },
+  commentHint: { fontSize: 11, fontWeight: '700' },
+  cardFooter: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginTop: Spacing.two, gap: Spacing.two, flexWrap: 'wrap',
+  },
+  postedText: { fontSize: 11, fontWeight: '700' },
   // Modal
   modalContent: { padding: Spacing.four, paddingBottom: 80 },
   modalHeader: {
@@ -610,6 +796,14 @@ const styles = StyleSheet.create({
   modalCancel: { fontSize: 15, fontWeight: '700', width: 50 },
   modalTitle: { fontSize: 18, fontWeight: '900' },
   multiline: { height: 80, textAlignVertical: 'top' },
-  locBtnText: { fontWeight: '800', fontSize: 13 },
+  placeHint: { fontSize: 12, fontWeight: '700', marginTop: Spacing.one },
+  placeRow: { paddingVertical: Spacing.two, paddingHorizontal: Spacing.three },
+  placeRowText: { fontSize: 14, fontWeight: '700' },
+  hostChipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, marginBottom: Spacing.two },
+  hostChipText: { fontWeight: '900', fontSize: 12 },
+  addClubChip: { borderStyle: 'dashed' },
+  addClubRow: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.one },
+  emojiInput: { width: 56, textAlign: 'center' },
+  clubNameInput: { flex: 1 },
   error: { color: '#ff6b6b', marginTop: Spacing.three, textAlign: 'center' },
 });

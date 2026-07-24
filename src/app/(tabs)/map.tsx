@@ -116,7 +116,7 @@ export default function MapScreen() {
     const [eventsRes, rsvpsRes] = await Promise.all([
       supabase
         .from('events')
-        .select('id, title, location, event_time, latitude, longitude, creator:profiles!events_created_by_fkey(username, display_name)'),
+        .select('id, title, location, event_time, latitude, longitude, host, creator:profiles!events_created_by_fkey(username, display_name)'),
       supabase.from('rsvps').select('event_id, user_id'),
     ]);
 
@@ -147,7 +147,9 @@ export default function MapScreen() {
         event_time: e.event_time,
         lat: e.latitude,
         lng: e.longitude,
-        hostName: e.creator?.username ? `@${e.creator.username}` : e.creator?.display_name ?? 'Someone',
+        hostName: e.host?.trim()
+          ? e.host
+          : e.creator?.username ? `@${e.creator.username}` : e.creator?.display_name ?? 'Someone',
         rsvpedByMe: !!user && rsvps.some((r) => r.event_id === e.id && r.user_id === user.id),
       }))
     );

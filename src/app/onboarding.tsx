@@ -1,8 +1,10 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-    ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
+    Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { addClub, Club, clubLabel, fetchClubs } from '../lib/clubs';
+import { pickImageFile, uploadAvatar } from '../lib/avatar';
 import { supabase } from '../supabaseClient';
 
 const INTEREST_OPTIONS = [
@@ -16,14 +18,54 @@ export default function OnboardingScreen() {
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
   const [interests, setInterests] = useState<string[]>([]);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [clubs, setClubs] = useState<Club[]>([]);
+  const [myClubs, setMyClubs] = useState<string[]>([]);
+  const [creatingClub, setCreatingClub] = useState(false);
+  const [createName, setCreateName] = useState('');
+  const [createEmoji, setCreateEmoji] = useState('');
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const router = useRouter();
+
+  useEffect(() => {
+    fetchClubs().then(setClubs);
+  }, []);
 
   function toggleInterest(tag: string) {
     setInterests(prev =>
       prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
     );
+  }
+
+  function toggleClub(label: string) {
+    setMyClubs(prev => (prev.includes(label) ? prev.filter(c => c !== label) : [...prev, label]));
+  }
+
+  async function handlePickAvatar() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const file = await pickImageFile();
+    if (!file) return;
+    setUploadingAvatar(true);
+    const url = await uploadAvatar(user.id, file);
+    setUploadingAvatar(false);
+    if (url) setAvatarUrl(url);
+  }
+
+  async function handleCreateClub() {
+    const created = await addClub(createName, createEmoji);
+    if (created) {
+      setClubs(prev =>
+        prev.some(c => c.id === created.id) ? prev : [...prev, created].sort((a, b) => a.name.localeCompare(b.name))
+      );
+      const label = clubLabel(created);
+      setMyClubs(prev => (prev.includes(label) ? prev : [...prev, label]));
+      setCreateName('');
+      setCreateEmoji('');
+      setCreatingClub(false);
+    }
   }
 
   async function handleSave() {
@@ -53,7 +95,9 @@ export default function OnboardingScreen() {
         display_name: displayName.trim(),
         username: username.trim().toLowerCase().replace(/\s+/g, '_'),
         bio: bio.trim(),
+        avatar_url: avatarUrl,
         interests,
+        extracurriculars: myClubs.map(name => ({ name, role: 'Member' })),
         onboarded: true,
       })
       .eq('id', user.id);
@@ -91,6 +135,21 @@ export default function OnboardingScreen() {
       <Text style={styles.subtitle}>
         This is how other students will see you.
       </Text>
+
+      <View style={styles.avatarWrap}>
+        <TouchableOpacity style={styles.avatarCircle} onPress={handlePickAvatar} activeOpacity={0.8}>
+          {uploadingAvatar ? (
+            <Text style={styles.avatarPlaceholder}>…</Text>
+          ) : avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.avatarImg} resizeMode="cover" />
+          ) : (
+            <Text style={styles.avatarPlaceholder}>📷</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handlePickAvatar}>
+          <Text style={styles.avatarBtnText}>{avatarUrl ? 'Change photo' : 'Add a photo'}</Text>
+        </TouchableOpacity>
+      </View>
 
       <Text style={styles.label}>Your name</Text>
       <TextInput
@@ -145,6 +204,53 @@ export default function OnboardingScreen() {
         })}
       </View>
 
+      <Text style={styles.label}>Your clubs</Text>
+      <Text style={styles.hint}>Pick the clubs you're in — or add a new one.</Text>
+      <View style={styles.chipWrap}>
+        {clubs.map(c => {
+          const label = clubLabel(c);
+          const selected = myClubs.includes(label);
+          return (
+            <TouchableOpacity
+              key={c.id}
+              style={[styles.chip, selected && styles.chipSelected]}
+              onPress={() => toggleClub(label)}
+            >
+              <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+        <TouchableOpacity
+          style={[styles.chip, styles.dashedChip]}
+          onPress={() => setCreatingClub(v => !v)}
+        >
+          <Text style={styles.chipText}>➕ New club</Text>
+        </TouchableOpacity>
+      </View>
+
+      {creatingClub && (
+        <View style={styles.createClubRow}>
+          <TextInput
+            style={[styles.input, styles.emojiInput]}
+            placeholder="🎸"
+            placeholderTextColor="#777"
+            value={createEmoji}
+            onChangeText={setCreateEmoji}
+            maxLength={2}
+          />
+          <TextInput
+            style={[styles.input, styles.flex1]}
+            placeholder="New club name"
+            placeholderTextColor="#777"
+            value={createName}
+            onChangeText={setCreateName}
+          />
+          <TouchableOpacity style={styles.createClubBtn} onPress={handleCreateClub}>
+            <Text style={styles.createClubBtnText}>Add</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {errorMsg ? <Text style={styles.error}>{errorMsg}</Text> : null}
 
       <TouchableOpacity
@@ -187,6 +293,23 @@ const styles = StyleSheet.create({
   chipSelected: { backgroundColor: '#E6007A', borderColor: '#fff' },
   chipText: { color: '#bbb', fontWeight: 'bold', fontSize: 13 },
   chipTextSelected: { color: '#fff' },
+  dashedChip: { borderStyle: 'dashed' },
+  avatarWrap: { alignItems: 'center', marginBottom: 20 },
+  avatarCircle: {
+    width: 96, height: 96, borderRadius: 48, borderWidth: 3, borderColor: '#fff',
+    backgroundColor: '#FFD93D', justifyContent: 'center', alignItems: 'center', overflow: 'hidden',
+  },
+  avatarImg: { width: '100%', height: '100%' },
+  avatarPlaceholder: { fontSize: 30 },
+  avatarBtnText: { color: '#7FE7E1', fontWeight: '900', fontSize: 12, marginTop: 8 },
+  createClubRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  emojiInput: { width: 56, textAlign: 'center' },
+  flex1: { flex: 1 },
+  createClubBtn: {
+    backgroundColor: '#7FE7E1', borderRadius: 12, paddingHorizontal: 16,
+    justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fff',
+  },
+  createClubBtnText: { fontWeight: '900', color: '#000', fontSize: 14 },
   button: {
     backgroundColor: '#FFD93D', padding: 16,
     borderRadius: 12, marginTop: 32,

@@ -43,7 +43,7 @@ export default function CalendarScreen() {
       (async () => {
         const { data } = await supabase
           .from('events')
-          .select('id, title, event_time, location, creator:profiles!events_created_by_fkey(username, display_name)')
+          .select('id, title, event_time, location, host, creator:profiles!events_created_by_fkey(username, display_name)')
           .order('event_time', { ascending: true });
 
         if (cancelled) return;
@@ -51,9 +51,11 @@ export default function CalendarScreen() {
         const mapped: CalendarEvent[] = (data ?? []).map((e: any, idx: number) => {
           const iso: string = e.event_time ?? '';
           const datePart = iso.slice(0, 10);
-          const host = e.creator?.username
-            ? `@${e.creator.username}`
-            : e.creator?.display_name ?? 'Someone';
+          const host = e.host?.trim()
+            ? e.host
+            : e.creator?.username
+              ? `@${e.creator.username}`
+              : e.creator?.display_name ?? 'Someone';
           let time = 'All day';
           if (iso.includes('T') && !iso.endsWith('T00:00:00')) {
             const d = new Date(iso);

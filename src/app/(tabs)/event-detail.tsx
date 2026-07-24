@@ -22,6 +22,8 @@ interface EventDetail {
   location: string | null;
   event_time: string | null;
   hostName: string;
+  postedBy: string;
+  created_at: string | null;
 }
 
 export default function EventDetailScreen() {
@@ -53,7 +55,7 @@ export default function EventDetailScreen() {
     const [eventRes, likesRes, rsvpsRes, commentsRes] = await Promise.all([
       supabase
         .from('events')
-        .select('id, title, description, location, event_time, creator:profiles!events_created_by_fkey(username, display_name)')
+        .select('id, title, description, location, event_time, host, created_at, creator:profiles!events_created_by_fkey(username, display_name)')
         .eq('id', id)
         .single(),
       supabase.from('event_likes').select('user_id').eq('event_id', id),
@@ -76,7 +78,11 @@ export default function EventDetailScreen() {
         description: e.description,
         location: e.location,
         event_time: e.event_time,
-        hostName: e.creator?.username ? `@${e.creator.username}` : e.creator?.display_name ?? 'Someone',
+        hostName: e.host?.trim()
+          ? e.host
+          : e.creator?.username ? `@${e.creator.username}` : e.creator?.display_name ?? 'Someone',
+        postedBy: e.creator?.username ? `@${e.creator.username}` : e.creator?.display_name ?? 'someone',
+        created_at: e.created_at,
       });
     }
 
@@ -220,6 +226,10 @@ export default function EventDetailScreen() {
               <ThemedText style={styles.detailText}>{formatEventTime(event.event_time)}</ThemedText>
             </View>
 
+            <ThemedText style={styles.postedText} themeColor="textSecondary">
+              📣 Posted {formatPosted(event.created_at)} by {event.postedBy}
+            </ThemedText>
+
             <View style={styles.actionsRow}>
               <TouchableOpacity
                 style={[dynamicStyles.actionBtn, { backgroundColor: rsvpedByMe ? colors.accentGreen : colors.accentYellow }]}
@@ -293,6 +303,21 @@ function formatEventTime(iso: string | null): string {
   return `${date} · ${time}`;
 }
 
+function formatPosted(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso.includes('T') ? iso : iso.replace(' ', 'T'));
+  if (isNaN(d.getTime())) return '';
+  const diff = Date.now() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 const styles = StyleSheet.create({
   content: { padding: Spacing.four, paddingBottom: 130 },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -305,6 +330,7 @@ const styles = StyleSheet.create({
   detailItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one, marginBottom: Spacing.one },
   detailEmoji: { fontSize: 16 },
   detailText: { fontSize: 13, fontWeight: 'bold' },
+  postedText: { fontSize: 12, fontWeight: '700', marginTop: Spacing.two },
   actionsRow: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.three },
   buttonText: { fontWeight: '900', color: '#000', fontSize: 14 },
   sectionTitle: { fontWeight: '900', fontSize: 16, letterSpacing: 0.5, marginTop: Spacing.two, marginBottom: Spacing.two },

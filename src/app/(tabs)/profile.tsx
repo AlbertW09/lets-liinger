@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -23,6 +24,7 @@ export default function ProfileScreen() {
     display_name: string;
     username: string;
     bio: string;
+    avatar_url: string | null;
     interests: string[];
     extracurriculars: { name: string; role: string }[];
   } | null>(null);
@@ -48,7 +50,7 @@ export default function ProfileScreen() {
         const [profileRes, rsvpRes] = await Promise.all([
           supabase
             .from('profiles')
-            .select('display_name, username, bio, interests, extracurriculars')
+            .select('display_name, username, bio, avatar_url, interests, extracurriculars')
             .eq('id', user.id)
             .single(),
           supabase
@@ -230,7 +232,9 @@ export default function ProfileScreen() {
         <View style={dynamicStyles.profileCardShadow}>
           <View style={dynamicStyles.profileCard}>
             <View style={dynamicStyles.avatarContainer}>
-              
+              {profile?.avatar_url ? (
+                <Image source={{ uri: profile.avatar_url }} style={dynamicStyles.avatarImage} resizeMode="cover" />
+              ) : null}
             </View>
 
             <ThemedText style={styles.userName}>
