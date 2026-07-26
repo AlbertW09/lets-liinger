@@ -1,35 +1,99 @@
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/constants/theme';
-import { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
-    useColorScheme
+  ActivityIndicator,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+  useColorScheme
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../../supabaseClient';
 
 export default function ProfileScreen() {
   const systemScheme = useColorScheme();
   const scheme = systemScheme === 'unspecified' ? 'light' : systemScheme;
   const colors = Colors[scheme];
+  const router = useRouter();
 
-  const [clubs, setClubs] = useState([
-    { id: '1', name: '🎸 Music Collective', role: 'Member', color: colors.accentPink },
-    { id: '2', name: '🕹️ Esports Club', role: 'Officer', color: colors.accentCyan },
-    { id: '3', name: '🍕 Student Union', role: 'Member', color: colors.accentYellow },
-  ]);
+  const [profile, setProfile] = useState<{
+    display_name: string;
+    username: string;
+    bio: string;
+    avatar_url: string | null;
+    interests: string[];
+    extracurriculars: { name: string; role: string }[];
+  } | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [savedEvents, setSavedEvents] = useState<{
+    id: string;
+    title: string;
+    host: string;
+    location: string;
+  }[]>([]);
+  const [menuVisible, setMenuVisible] = useState(false);
 
-  const [savedEvents] = useState([
-    {
-      id: '1',
-      title: 'HOUSE PARTY & INDIE JAM',
-      host: '🎸 MUSIC COLLECTIVE',
-      location: 'STUDENT PLAZA',
-      status: 'RSVP\'D',
-    }
-  ]);
+  async function handleLogOut() {
+    setMenuVisible(false);
+    await supabase.auth.signOut();
+    // Root layout listens for the auth-state change and redirects to /auth
+  }
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+
+      async function fetchProfile() {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          if (!cancelled) setLoadingProfile(false);
+          return;
+        }
+
+        const [profileRes, rsvpRes] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('display_name, username, bio, avatar_url, interests, extracurriculars')
+            .eq('id', user.id)
+            .single(),
+          supabase
+            .from('rsvps')
+            .select('event:events!rsvps_event_id_fkey(id, title, location, creator:profiles!events_created_by_fkey(username, display_name))')
+            .eq('user_id', user.id),
+        ]);
+
+        if (cancelled) return;
+
+        if (!profileRes.error) {
+          setProfile(profileRes.data);
+        }
+
+        const rsvped = (rsvpRes.data ?? [])
+          .map((r: any) => r.event)
+          .filter(Boolean)
+          .map((e: any) => ({
+            id: e.id,
+            title: e.title,
+            location: e.location ?? 'TBD',
+            host: e.creator?.username ? `@${e.creator.username}` : e.creator?.display_name ?? 'Someone',
+          }));
+        setSavedEvents(rsvped);
+
+        setLoadingProfile(false);
+      }
+
+      fetchProfile();
+      return () => { cancelled = true; };
+    }, [])
+  );
+
+  const clubColors = [colors.accentPink, colors.accentCyan, colors.accentYellow, colors.accentGreen];
 
   const dynamicStyles = StyleSheet.create({
     safeArea: {
@@ -150,8 +214,33 @@ export default function ProfileScreen() {
       paddingVertical: Spacing.two,
       alignItems: 'center',
       transform: [{ translateX: -3 }, { translateY: -3 }],
-    }
+    },
+    menuShadow: {
+      backgroundColor: colors.border,
+      borderRadius: 16,
+      marginTop: 60,
+      marginRight: Spacing.four,
+    },
+    menu: {
+      backgroundColor: colors.backgroundElement,
+      borderWidth: 3,
+      borderColor: colors.border,
+      borderRadius: 16,
+      minWidth: 160,
+      paddingVertical: Spacing.one,
+      transform: [{ translateX: -4 }, { translateY: -4 }],
+    },
   });
+
+  if (loadingProfile) {
+    return (
+      <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={colors.text} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right']}>
@@ -159,29 +248,65 @@ export default function ProfileScreen() {
         
         <View style={styles.header}>
           <ThemedText style={dynamicStyles.headerText}>my profile</ThemedText>
-          <TouchableOpacity style={[styles.iconBtn, { borderColor: colors.border }]}>
+          <TouchableOpacity
+            style={[styles.iconBtn, { borderColor: colors.border }]}
+            onPress={() => setMenuVisible(true)}
+          >
             <ThemedText style={styles.emojiText}>⚙️</ThemedText>
           </TouchableOpacity>
         </View>
 
+        <Modal
+          visible={menuVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setMenuVisible(false)}
+        >
+          <Pressable style={styles.menuBackdrop} onPress={() => setMenuVisible(false)}>
+            <View style={dynamicStyles.menuShadow}>
+              <View style={dynamicStyles.menu}>
+                <TouchableOpacity style={styles.menuItem} onPress={handleLogOut}>
+                  <ThemedText style={styles.menuItemText}>🚪 Log Out</ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
+
         <View style={dynamicStyles.profileCardShadow}>
           <View style={dynamicStyles.profileCard}>
             <View style={dynamicStyles.avatarContainer}>
-              
+              {profile?.avatar_url ? (
+                <Image source={{ uri: profile.avatar_url }} style={dynamicStyles.avatarImage} resizeMode="cover" />
+              ) : null}
             </View>
 
-            <ThemedText style={styles.userName}>ALEX RIVERA</ThemedText>
+            <ThemedText style={styles.userName}>
+              {(profile?.display_name || 'New Student').toUpperCase()}
+            </ThemedText>
             
             <View style={dynamicStyles.handleBadge}>
-              <ThemedText style={styles.handleText}>@alex_y2k</ThemedText>
+              <ThemedText style={styles.handleText}>
+                @{profile?.username || 'username'}
+              </ThemedText>
             </View>
 
             <ThemedText style={styles.bioText}>
-              Senior @ Campus | Music & Retro Gaming Enthusiast 👾🎸
+              {profile?.bio || 'No bio yet.'}
             </ThemedText>
 
+            {!!profile?.interests?.length && (
+              <View style={styles.interestsWrap}>
+                {profile.interests.map((tag) => (
+                  <View key={tag} style={[styles.interestChip, { borderColor: colors.border }]}>
+                    <ThemedText style={styles.interestChipText}>{tag}</ThemedText>
+                  </View>
+                ))}
+              </View>
+            )}
+
             <View style={dynamicStyles.editBtnShadow}>
-              <TouchableOpacity style={dynamicStyles.editBtn}>
+              <TouchableOpacity style={dynamicStyles.editBtn} onPress={() => router.push('/edit-profile')}>
                 <ThemedText style={styles.boldBtnText}>EDIT PROFILE</ThemedText>
               </TouchableOpacity>
             </View>
@@ -191,22 +316,15 @@ export default function ProfileScreen() {
         <View style={styles.statsRow}>
           <View style={dynamicStyles.statBoxShadow}>
             <View style={dynamicStyles.statBox}>
-              <ThemedText style={styles.statNumber}>12</ThemedText>
+              <ThemedText style={styles.statNumber}>{savedEvents.length}</ThemedText>
               <ThemedText style={styles.statLabel}>RSVPS</ThemedText>
             </View>
           </View>
 
           <View style={dynamicStyles.statBoxShadow}>
             <View style={dynamicStyles.statBox}>
-              <ThemedText style={styles.statNumber}>3</ThemedText>
+              <ThemedText style={styles.statNumber}>{profile?.extracurriculars?.length ?? 0}</ThemedText>
               <ThemedText style={styles.statLabel}>CLUBS</ThemedText>
-            </View>
-          </View>
-
-          <View style={dynamicStyles.statBoxShadow}>
-            <View style={dynamicStyles.statBox}>
-              <ThemedText style={styles.statNumber}>45</ThemedText>
-              <ThemedText style={styles.statLabel}>UPVOTES</ThemedText>
             </View>
           </View>
         </View>
@@ -215,9 +333,15 @@ export default function ProfileScreen() {
           <ThemedText style={styles.sectionTitle}>🏷️ MY CLUBS</ThemedText>
         </View>
 
-        {clubs.map((club) => (
-          <View key={club.id} style={dynamicStyles.clubTagShadow}>
-            <View style={[dynamicStyles.clubTag, { backgroundColor: club.color }]}>
+        {!profile?.extracurriculars?.length && (
+          <ThemedText style={styles.emptyText} themeColor="textSecondary">
+            No extracurriculars added yet. Add some from Edit Profile.
+          </ThemedText>
+        )}
+
+        {profile?.extracurriculars?.map((club, index) => (
+          <View key={`${club.name}-${index}`} style={dynamicStyles.clubTagShadow}>
+            <View style={[dynamicStyles.clubTag, { backgroundColor: clubColors[index % clubColors.length] }]}>
               <ThemedText style={styles.clubNameText}>{club.name}</ThemedText>
               <View style={[styles.roleBadge, { borderColor: colors.border }]}>
                 <ThemedText style={styles.roleText}>{club.role}</ThemedText>
@@ -230,16 +354,27 @@ export default function ProfileScreen() {
           <ThemedText style={styles.sectionTitle}>⚡️ MY ACTIVITY</ThemedText>
         </View>
 
+        {savedEvents.length === 0 && (
+          <ThemedText style={styles.emptyText} themeColor="textSecondary">
+            No RSVPs yet. RSVP to events from the home feed.
+          </ThemedText>
+        )}
+
         {savedEvents.map((event) => (
-          <View key={event.id} style={dynamicStyles.eventCardShadow}>
+          <TouchableOpacity
+            key={event.id}
+            style={dynamicStyles.eventCardShadow}
+            activeOpacity={0.9}
+            onPress={() => router.push(`/event-detail?id=${event.id}`)}
+          >
             <View style={dynamicStyles.eventCard}>
               <View style={dynamicStyles.statusBadge}>
-                <ThemedText style={styles.statusText}>{event.status}</ThemedText>
+                <ThemedText style={styles.statusText}>RSVP'D</ThemedText>
               </View>
               <ThemedText style={styles.eventTitle}>{event.title}</ThemedText>
               <ThemedText style={styles.eventMeta}>Hosted by {event.host} • 📍 {event.location}</ThemedText>
             </View>
-          </View>
+          </TouchableOpacity>
         ))}
 
       </ScrollView>
@@ -251,6 +386,11 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: Spacing.four,
     paddingBottom: 130,
+  },
+  loadingWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     flexDirection: 'row',
@@ -283,6 +423,23 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     marginVertical: Spacing.one,
   },
+  interestsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: Spacing.one,
+    marginBottom: Spacing.one,
+  },
+  interestChip: {
+    borderWidth: 1.5,
+    borderRadius: 999,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 3,
+  },
+  interestChipText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
   boldBtnText: {
     fontWeight: '900',
     color: '#000',
@@ -311,6 +468,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontSize: 16,
     letterSpacing: 0.5,
+  },
+  emptyText: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: Spacing.two,
   },
   clubNameText: {
     fontSize: 14,
@@ -343,5 +505,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     opacity: 0.6,
+  },
+  menuBackdrop: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  menuItem: {
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
+  },
+  menuItemText: {
+    fontSize: 14,
+    fontWeight: '900',
   },
 });
