@@ -1,3 +1,4 @@
+import { DateTimeField } from '@/components/date-time-field';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/constants/theme';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -15,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../supabaseClient';
 import { addClub, Club, clubLabel, fetchClubs } from '../../lib/clubs';
+import { PlaceResult, searchPlaces } from '../../lib/places';
 
 type SortMode = 'popular' | 'recent' | 'nearby';
 
@@ -40,31 +42,6 @@ interface EnrichedEvent {
   rsvpers: string[];
   rsvpedByMe: boolean;
   distance: number | null;
-}
-
-interface PlaceResult {
-  name: string;
-  lat: number;
-  lng: number;
-}
-
-// Geocode against OpenStreetMap's Nominatim so the location is always a real map place.
-async function searchPlaces(query: string): Promise<PlaceResult[]> {
-  if (typeof fetch === 'undefined') return [];
-  const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&q=${encodeURIComponent(query)}`;
-  try {
-    const res = await fetch(url, { headers: { Accept: 'application/json' } });
-    const data = await res.json();
-    return (data ?? []).map((d: any) => ({
-      name: d.name && d.name.trim()
-        ? `${d.name}${d.address?.city || d.address?.town ? `, ${d.address.city ?? d.address.town}` : ''}`
-        : String(d.display_name).split(',').slice(0, 2).join(',').trim(),
-      lat: parseFloat(d.lat),
-      lng: parseFloat(d.lon),
-    }));
-  } catch {
-    return [];
-  }
 }
 
 // "Posted 3h ago" style relative label.
@@ -128,8 +105,8 @@ export default function HomeScreen() {
   const [createVisible, setCreateVisible] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [dateStr, setDateStr] = useState('');
-  const [timeStr, setTimeStr] = useState('');
+  const [pickedDate, setPickedDate] = useState<Date | null>(null);
+  const [pickedTime, setPickedTime] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -285,8 +262,8 @@ export default function HomeScreen() {
   function resetForm() {
     setTitle('');
     setDescription('');
-    setDateStr('');
-    setTimeStr('');
+    setPickedDate(null);
+    setPickedTime(null);
     setPlaceQuery('');
     setPlaceResults([]);
     setPlaceSelected(null);
@@ -303,12 +280,8 @@ export default function HomeScreen() {
       setFormError('Give your event a title.');
       return;
     }
-    if (!dateStr.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr.trim())) {
-      setFormError('Enter a date as YYYY-MM-DD.');
-      return;
-    }
-    if (timeStr.trim() && !/^\d{2}:\d{2}$/.test(timeStr.trim())) {
-      setFormError('Enter time as HH:MM (24h), or leave it blank.');
+    if (!pickedDate) {
+      setFormError('Pick a date.');
       return;
     }
     if (!placeSelected) {
@@ -324,13 +297,18 @@ export default function HomeScreen() {
       return;
     }
 
-    const eventTime = `${dateStr.trim()}T${(timeStr.trim() || '00:00')}:00`;
+    const y = pickedDate.getFullYear();
+    const m = String(pickedDate.getMonth() + 1).padStart(2, '0');
+    const d = String(pickedDate.getDate()).padStart(2, '0');
+    const hh = pickedTime ? String(pickedTime.getHours()).padStart(2, '0') : '00';
+    const mm = pickedTime ? String(pickedTime.getMinutes()).padStart(2, '0') : '00';
+    const eventTimeIso = `${y}-${m}-${d}T${hh}:${mm}:00`;
 
     const { error } = await supabase.from('events').insert({
       title: title.trim(),
       description: description.trim() || null,
       location: placeSelected.name,
-      event_time: eventTime,
+      event_time: eventTimeIso,
       created_by: user.id,
       host: host.trim() || null,
       latitude: placeSelected.lat,
@@ -703,21 +681,21 @@ export default function HomeScreen() {
             )}
 
             <ThemedText style={dynamicStyles.label}>Date</ThemedText>
-            <TextInput
-              style={dynamicStyles.formInput}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.textSecondary}
-              value={dateStr}
-              onChangeText={setDateStr}
+            <DateTimeField
+              mode="date"
+              value={pickedDate}
+              onChange={setPickedDate}
+              placeholder="Pick a date"
+              colors={colors}
             />
 
             <ThemedText style={dynamicStyles.label}>Time (optional)</ThemedText>
-            <TextInput
-              style={dynamicStyles.formInput}
-              placeholder="HH:MM (24h)"
-              placeholderTextColor={colors.textSecondary}
-              value={timeStr}
-              onChangeText={setTimeStr}
+            <DateTimeField
+              mode="time"
+              value={pickedTime}
+              onChange={setPickedTime}
+              placeholder="Pick a time"
+              colors={colors}
             />
 
             {formError ? <ThemedText style={styles.error}>{formError}</ThemedText> : null}

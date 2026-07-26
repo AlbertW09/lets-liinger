@@ -5,6 +5,8 @@ import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -35,6 +37,13 @@ export default function ProfileScreen() {
     host: string;
     location: string;
   }[]>([]);
+  const [menuVisible, setMenuVisible] = useState(false);
+
+  async function handleLogOut() {
+    setMenuVisible(false);
+    await supabase.auth.signOut();
+    // Root layout listens for the auth-state change and redirects to /auth
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -205,7 +214,22 @@ export default function ProfileScreen() {
       paddingVertical: Spacing.two,
       alignItems: 'center',
       transform: [{ translateX: -3 }, { translateY: -3 }],
-    }
+    },
+    menuShadow: {
+      backgroundColor: colors.border,
+      borderRadius: 16,
+      marginTop: 60,
+      marginRight: Spacing.four,
+    },
+    menu: {
+      backgroundColor: colors.backgroundElement,
+      borderWidth: 3,
+      borderColor: colors.border,
+      borderRadius: 16,
+      minWidth: 160,
+      paddingVertical: Spacing.one,
+      transform: [{ translateX: -4 }, { translateY: -4 }],
+    },
   });
 
   if (loadingProfile) {
@@ -224,10 +248,30 @@ export default function ProfileScreen() {
         
         <View style={styles.header}>
           <ThemedText style={dynamicStyles.headerText}>my profile</ThemedText>
-          <TouchableOpacity style={[styles.iconBtn, { borderColor: colors.border }]}>
+          <TouchableOpacity
+            style={[styles.iconBtn, { borderColor: colors.border }]}
+            onPress={() => setMenuVisible(true)}
+          >
             <ThemedText style={styles.emojiText}>⚙️</ThemedText>
           </TouchableOpacity>
         </View>
+
+        <Modal
+          visible={menuVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setMenuVisible(false)}
+        >
+          <Pressable style={styles.menuBackdrop} onPress={() => setMenuVisible(false)}>
+            <View style={dynamicStyles.menuShadow}>
+              <View style={dynamicStyles.menu}>
+                <TouchableOpacity style={styles.menuItem} onPress={handleLogOut}>
+                  <ThemedText style={styles.menuItemText}>🚪 Log Out</ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
 
         <View style={dynamicStyles.profileCardShadow}>
           <View style={dynamicStyles.profileCard}>
@@ -281,13 +325,6 @@ export default function ProfileScreen() {
             <View style={dynamicStyles.statBox}>
               <ThemedText style={styles.statNumber}>{profile?.extracurriculars?.length ?? 0}</ThemedText>
               <ThemedText style={styles.statLabel}>CLUBS</ThemedText>
-            </View>
-          </View>
-
-          <View style={dynamicStyles.statBoxShadow}>
-            <View style={dynamicStyles.statBox}>
-              <ThemedText style={styles.statNumber}>45</ThemedText>
-              <ThemedText style={styles.statLabel}>UPVOTES</ThemedText>
             </View>
           </View>
         </View>
@@ -468,5 +505,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     opacity: 0.6,
+  },
+  menuBackdrop: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  menuItem: {
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
+  },
+  menuItemText: {
+    fontSize: 14,
+    fontWeight: '900',
   },
 });

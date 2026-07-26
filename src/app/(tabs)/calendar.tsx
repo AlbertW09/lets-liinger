@@ -156,12 +156,15 @@ export default function CalendarScreen() {
       borderColor: 'transparent',
     },
     eventDot: {
-      width: 5,
-      height: 5,
-      borderRadius: 2.5,
-      backgroundColor: colors.accentPink,
       position: 'absolute',
-      bottom: 3,
+      top: '50%',
+      left: '50%',
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      marginTop: -14,
+      marginLeft: -14,
+      backgroundColor: colors.accentPink,
     },
     eventCardShadow: {
       backgroundColor: colors.border,
@@ -225,6 +228,7 @@ export default function CalendarScreen() {
         cellYear === today.getFullYear();
 
       const hasEvents = scheduledEvents.some(e => e.date === dateStr);
+      const showDot = hasEvents && !isSelected && !isToday;
 
       gridCells.push(
         <TouchableOpacity
@@ -238,18 +242,18 @@ export default function CalendarScreen() {
             isSelected && { backgroundColor: colors.accentCyan, borderColor: colors.border, borderWidth: 2 },
             !isSelected && isToday && { backgroundColor: colors.accentYellow, borderColor: colors.border, borderWidth: 2 },
           ]}>
+            {showDot && <View style={dynamicStyles.eventDot} />}
             <ThemedText style={{
-              fontWeight: isSelected || isToday ? '900' : '700',
-              color: isSelected || isToday 
-                ? '#000' 
-                : isCurrentMonth 
-                  ? colors.text 
+              fontWeight: isSelected || isToday || showDot ? '900' : '700',
+              color: isSelected || isToday || showDot
+                ? '#000'
+                : isCurrentMonth
+                  ? colors.text
                   : colors.text + '33', // Faded color for outside-month days
               fontSize: 13,
             }}>
               {cellDay}
             </ThemedText>
-            {hasEvents && !isSelected && <View style={dynamicStyles.eventDot} />}
           </View>
         </TouchableOpacity>
       );
