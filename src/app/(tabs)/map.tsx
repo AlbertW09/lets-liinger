@@ -1,11 +1,16 @@
-import { ThemedText } from '@/components/themed-text';
-import { Colors, Spacing } from '@/constants/theme';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Platform, ScrollView, StyleSheet, TouchableOpacity, useColorScheme, View,
+  ActivityIndicator, Platform, ScrollView, StyleSheet, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { ThemedText } from '@/components/themed-text';
+import { Chip } from '@/components/ui/chip';
+import { IconButton } from '@/components/ui/icon-button';
+import { ShadowSurface } from '@/components/ui/shadow-surface';
+import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '../../supabaseClient';
 
 type DateFilter = 'all' | 'tonight' | 'week';
@@ -87,9 +92,7 @@ function formatEventTime(iso: string | null): string {
 }
 
 export default function MapScreen() {
-  const systemScheme = useColorScheme();
-  const scheme = systemScheme === 'unspecified' ? 'light' : systemScheme;
-  const colors = Colors[scheme];
+  const colors = useTheme();
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -261,31 +264,11 @@ export default function MapScreen() {
     { key: 'week', label: '📆 This week' },
   ];
 
-  const dynamicStyles = StyleSheet.create({
+  const dynamicStyles = useMemo(() => StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: colors.background },
     headerText: {
       color: colors.text, fontFamily: 'ui-rounded', fontWeight: '900',
       fontSize: 28, letterSpacing: -1,
-    },
-    filterChip: {
-      paddingVertical: Spacing.one, paddingHorizontal: Spacing.three, borderRadius: 999,
-      borderWidth: 2, borderColor: colors.border, backgroundColor: colors.backgroundElement,
-    },
-    filterChipActive: { backgroundColor: colors.accentPink },
-    mapShadow: { backgroundColor: colors.border, borderRadius: 20, marginBottom: Spacing.three },
-    mapWrap: {
-      backgroundColor: colors.backgroundElement,
-      borderWidth: 3, borderColor: colors.border, borderRadius: 20,
-      height: 460, overflow: 'hidden', position: 'relative',
-      transform: [{ translateX: -5 }, { translateY: -5 }],
-    },
-    popupShadow: {
-      position: 'absolute', left: Spacing.three, right: Spacing.three, bottom: Spacing.three,
-      backgroundColor: colors.border, borderRadius: 16, zIndex: 1000,
-    },
-    popup: {
-      backgroundColor: colors.background, borderWidth: 3, borderColor: colors.border, borderRadius: 16,
-      padding: Spacing.three, transform: [{ translateX: -4 }, { translateY: -4 }],
     },
     rsvpBtn: {
       borderWidth: 2, borderColor: colors.border, borderRadius: 10,
@@ -296,43 +279,45 @@ export default function MapScreen() {
       paddingVertical: Spacing.two, paddingHorizontal: Spacing.three, alignItems: 'center',
       backgroundColor: colors.accentCyan,
     },
-    // native fallback list
-    listCardShadow: { backgroundColor: colors.border, borderRadius: 16, marginBottom: Spacing.three },
-    listCard: {
-      backgroundColor: colors.backgroundElement, borderWidth: 2, borderColor: colors.border,
-      borderRadius: 16, padding: Spacing.three, transform: [{ translateX: -3 }, { translateY: -3 }],
+    emptyPill: {
+      borderWidth: 2, borderRadius: 12, paddingVertical: Spacing.two, paddingHorizontal: Spacing.three,
+      backgroundColor: colors.background, borderColor: colors.border,
     },
-  });
+  }), [colors]);
 
   const renderPopup = () =>
     selected ? (
-      <View style={dynamicStyles.popupShadow}>
-        <View style={dynamicStyles.popup}>
-          <View style={styles.popupHeader}>
-            <ThemedText style={styles.popupTitle} numberOfLines={1}>{selected.title}</ThemedText>
-            <TouchableOpacity onPress={() => setSelectedId(null)}>
-              <ThemedText style={styles.popupClose}>✕</ThemedText>
-            </TouchableOpacity>
-          </View>
-          <ThemedText style={styles.popupMeta} themeColor="textSecondary">
-            🕒 {formatEventTime(selected.event_time)}
-          </ThemedText>
-          <ThemedText style={styles.popupMeta} themeColor="textSecondary">
-            📍 {selected.location ?? 'TBD'} · {selected.hostName}
-          </ThemedText>
-          <View style={styles.popupActions}>
-            <TouchableOpacity
-              style={[dynamicStyles.rsvpBtn, { backgroundColor: selected.rsvpedByMe ? colors.accentGreen : colors.accentYellow }]}
-              onPress={() => toggleRsvp(selected)}
-            >
-              <ThemedText style={styles.btnText}>{selected.rsvpedByMe ? "✓ RSVP'D!" : 'RSVP'}</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity style={dynamicStyles.seeMoreBtn} onPress={() => router.push(`/event-detail?id=${selected.id}`)}>
-              <ThemedText style={styles.btnText}>See more →</ThemedText>
-            </TouchableOpacity>
-          </View>
+      <ShadowSurface
+        backgroundColor={colors.background}
+        radius={16}
+        offset={4}
+        wrapperStyle={styles.popupShadow}
+        style={styles.popup}
+      >
+        <View style={styles.popupHeader}>
+          <ThemedText style={styles.popupTitle} numberOfLines={1}>{selected.title}</ThemedText>
+          <TouchableOpacity onPress={() => setSelectedId(null)}>
+            <ThemedText style={styles.popupClose}>✕</ThemedText>
+          </TouchableOpacity>
         </View>
-      </View>
+        <ThemedText style={styles.popupMeta} themeColor="textSecondary">
+          🕒 {formatEventTime(selected.event_time)}
+        </ThemedText>
+        <ThemedText style={styles.popupMeta} themeColor="textSecondary">
+          📍 {selected.location ?? 'TBD'} · {selected.hostName}
+        </ThemedText>
+        <View style={styles.popupActions}>
+          <TouchableOpacity
+            style={[dynamicStyles.rsvpBtn, { backgroundColor: selected.rsvpedByMe ? colors.accentGreen : colors.accentYellow }]}
+            onPress={() => toggleRsvp(selected)}
+          >
+            <ThemedText style={styles.btnText}>{selected.rsvpedByMe ? "✓ RSVP'D!" : 'RSVP'}</ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity style={dynamicStyles.seeMoreBtn} onPress={() => router.push(`/event-detail?id=${selected.id}`)}>
+            <ThemedText style={styles.btnText}>See more →</ThemedText>
+          </TouchableOpacity>
+        </View>
+      </ShadowSurface>
     ) : null;
 
   return (
@@ -340,52 +325,48 @@ export default function MapScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <ThemedText style={dynamicStyles.headerText}>campus map</ThemedText>
-          <TouchableOpacity style={[styles.iconBtn, { borderColor: colors.border }]}>
-            <ThemedText style={styles.emojiText}>🗺️</ThemedText>
-          </TouchableOpacity>
+          <IconButton emoji="🗺️" />
         </View>
 
         <View style={styles.filterRow}>
           {filters.map((f) => (
-            <TouchableOpacity
-              key={f.key}
-              style={[dynamicStyles.filterChip, dateFilter === f.key && dynamicStyles.filterChipActive]}
-              onPress={() => setDateFilter(f.key)}
-            >
-              <ThemedText style={styles.filterChipText}>{f.label}</ThemedText>
-            </TouchableOpacity>
+            <Chip key={f.key} label={f.label} selected={dateFilter === f.key} onPress={() => setDateFilter(f.key)} />
           ))}
         </View>
 
         {IS_WEB ? (
-          <View style={dynamicStyles.mapShadow}>
-            <View style={dynamicStyles.mapWrap}>
-              {/* Leaflet mounts into this element */}
-              <View nativeID={MAP_EL_ID} style={StyleSheet.absoluteFill} />
+          <ShadowSurface
+            backgroundColor={colors.backgroundElement}
+            radius={20}
+            offset={5}
+            wrapperStyle={styles.mapShadow}
+            style={styles.mapWrap}
+          >
+            {/* Leaflet mounts into this element */}
+            <View nativeID={MAP_EL_ID} style={StyleSheet.absoluteFill} />
 
-              {(!mapReady || loading) && !mapError && (
-                <View style={styles.overlayCenter} pointerEvents="none">
-                  <ActivityIndicator size="large" color={colors.text} />
+            {(!mapReady || loading) && !mapError && (
+              <View style={styles.overlayCenter} pointerEvents="none">
+                <ActivityIndicator size="large" color={colors.text} />
+              </View>
+            )}
+            {mapError && (
+              <View style={styles.overlayCenter} pointerEvents="none">
+                <ThemedText style={styles.emptyText} themeColor="textSecondary">
+                  Couldn’t load the map. Check your connection.
+                </ThemedText>
+              </View>
+            )}
+            {mapReady && !loading && pins.length === 0 && (
+              <View style={styles.overlayCenter} pointerEvents="none">
+                <View style={dynamicStyles.emptyPill}>
+                  <ThemedText style={styles.emptyText}>No upcoming events with a location here.</ThemedText>
                 </View>
-              )}
-              {mapError && (
-                <View style={styles.overlayCenter} pointerEvents="none">
-                  <ThemedText style={styles.emptyText} themeColor="textSecondary">
-                    Couldn’t load the map. Check your connection.
-                  </ThemedText>
-                </View>
-              )}
-              {mapReady && !loading && pins.length === 0 && (
-                <View style={styles.overlayCenter} pointerEvents="none">
-                  <View style={[styles.emptyPill, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                    <ThemedText style={styles.emptyText}>No upcoming events with a location here.</ThemedText>
-                  </View>
-                </View>
-              )}
+              </View>
+            )}
 
-              {renderPopup()}
-            </View>
-          </View>
+            {renderPopup()}
+          </ShadowSurface>
         ) : (
           // Native fallback: a simple tappable list
           <View>
@@ -397,22 +378,24 @@ export default function MapScreen() {
               </ThemedText>
             ) : (
               pins.map((pin) => (
-                <TouchableOpacity
+                <ShadowSurface
                   key={pin.id}
-                  style={dynamicStyles.listCardShadow}
-                  activeOpacity={0.9}
+                  backgroundColor={colors.backgroundElement}
+                  radius={16}
+                  offset={3}
+                  borderWidth={2}
+                  wrapperStyle={styles.listCardShadow}
+                  style={styles.listCard}
                   onPress={() => router.push(`/event-detail?id=${pin.id}`)}
                 >
-                  <View style={dynamicStyles.listCard}>
-                    <ThemedText style={styles.popupTitle}>{pin.title}</ThemedText>
-                    <ThemedText style={styles.popupMeta} themeColor="textSecondary">
-                      🕒 {formatEventTime(pin.event_time)}
-                    </ThemedText>
-                    <ThemedText style={styles.popupMeta} themeColor="textSecondary">
-                      📍 {pin.location ?? 'TBD'} · {pin.hostName}
-                    </ThemedText>
-                  </View>
-                </TouchableOpacity>
+                  <ThemedText style={styles.popupTitle}>{pin.title}</ThemedText>
+                  <ThemedText style={styles.popupMeta} themeColor="textSecondary">
+                    🕒 {formatEventTime(pin.event_time)}
+                  </ThemedText>
+                  <ThemedText style={styles.popupMeta} themeColor="textSecondary">
+                    📍 {pin.location ?? 'TBD'} · {pin.hostName}
+                  </ThemedText>
+                </ShadowSurface>
               ))
             )}
           </View>
@@ -454,16 +437,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', marginBottom: Spacing.three,
   },
-  iconBtn: { padding: Spacing.two, borderRadius: 50, borderWidth: 2 },
-  emojiText: { fontSize: 18 },
   filterRow: { flexDirection: 'row', gap: Spacing.two, marginBottom: Spacing.three },
-  filterChipText: { fontWeight: '900', fontSize: 12 },
-  overlayCenter: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center', alignItems: 'center', padding: Spacing.four,
+  mapShadow: { marginBottom: Spacing.three },
+  mapWrap: { height: 460, overflow: 'hidden', position: 'relative' },
+  popupShadow: {
+    position: 'absolute', left: Spacing.three, right: Spacing.three, bottom: Spacing.three, zIndex: 1000,
   },
-  emptyPill: {
-    borderWidth: 2, borderRadius: 12, paddingVertical: Spacing.two, paddingHorizontal: Spacing.three,
+  popup: { padding: Spacing.three },
+  overlayCenter: {
+    ...StyleSheet.absoluteFill,
+    justifyContent: 'center', alignItems: 'center', padding: Spacing.four,
   },
   emptyText: { fontSize: 13, fontWeight: '800', textAlign: 'center' },
   popupHeader: {
@@ -475,6 +458,8 @@ const styles = StyleSheet.create({
   popupMeta: { fontSize: 12, fontWeight: '700', marginTop: 2 },
   popupActions: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.three },
   btnText: { fontWeight: '900', color: '#000', fontSize: 13 },
+  listCardShadow: { marginBottom: Spacing.three },
+  listCard: { padding: Spacing.three },
   legendRow: { flexDirection: 'row', gap: Spacing.three, marginBottom: Spacing.two, flexWrap: 'wrap' },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
   legendDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 2 },

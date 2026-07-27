@@ -1,7 +1,5 @@
-import { ThemedText } from '@/components/themed-text';
-import { Colors, Spacing } from '@/constants/theme';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -11,15 +9,19 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
-  useColorScheme
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { ThemedText } from '@/components/themed-text';
+import { Badge } from '@/components/ui/badge';
+import { IconButton } from '@/components/ui/icon-button';
+import { ShadowSurface } from '@/components/ui/shadow-surface';
+import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '../../supabaseClient';
 
 export default function ProfileScreen() {
-  const systemScheme = useColorScheme();
-  const scheme = systemScheme === 'unspecified' ? 'light' : systemScheme;
-  const colors = Colors[scheme];
+  const colors = useTheme();
   const router = useRouter();
 
   const [profile, setProfile] = useState<{
@@ -95,7 +97,7 @@ export default function ProfileScreen() {
 
   const clubColors = [colors.accentPink, colors.accentCyan, colors.accentYellow, colors.accentGreen];
 
-  const dynamicStyles = StyleSheet.create({
+  const dynamicStyles = useMemo(() => StyleSheet.create({
     safeArea: {
       flex: 1,
       backgroundColor: colors.background,
@@ -107,20 +109,6 @@ export default function ProfileScreen() {
       fontSize: 28,
       letterSpacing: -1,
     },
-    profileCardShadow: {
-      backgroundColor: colors.border,
-      borderRadius: 24,
-      marginBottom: Spacing.four,
-    },
-    profileCard: {
-      backgroundColor: colors.backgroundElement,
-      borderWidth: 3,
-      borderColor: colors.border,
-      borderRadius: 24,
-      padding: Spacing.four,
-      alignItems: 'center',
-      transform: [{ translateX: -6 }, { translateY: -6 }],
-    },
     avatarContainer: {
       width: 100,
       height: 100,
@@ -131,106 +119,9 @@ export default function ProfileScreen() {
       justifyContent: 'center',
       alignItems: 'center',
       marginBottom: Spacing.two,
+      overflow: 'hidden',
     },
-    avatarImage: {
-      width: 94,
-      height: 94,
-      borderRadius: 47,
-    },
-    handleBadge: {
-      backgroundColor: colors.accentCyan,
-      borderWidth: 2,
-      borderColor: colors.border,
-      borderRadius: 12,
-      paddingHorizontal: Spacing.two,
-      paddingVertical: Spacing.half,
-      marginTop: Spacing.one,
-      marginBottom: Spacing.two,
-    },
-    statBoxShadow: {
-      flex: 1,
-      backgroundColor: colors.border,
-      borderRadius: 16,
-    },
-    statBox: {
-      backgroundColor: colors.backgroundElement,
-      borderWidth: 3,
-      borderColor: colors.border,
-      borderRadius: 16,
-      paddingVertical: Spacing.two,
-      alignItems: 'center',
-      transform: [{ translateX: -4 }, { translateY: -4 }],
-    },
-    clubTagShadow: {
-      backgroundColor: colors.border,
-      borderRadius: 14,
-      marginBottom: Spacing.two,
-    },
-    clubTag: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      borderWidth: 2,
-      borderColor: colors.border,
-      borderRadius: 14,
-      paddingHorizontal: Spacing.three,
-      paddingVertical: Spacing.two,
-      transform: [{ translateX: -3 }, { translateY: -3 }],
-    },
-    eventCardShadow: {
-      backgroundColor: colors.border,
-      borderRadius: 16,
-      marginBottom: Spacing.two,
-    },
-    eventCard: {
-      backgroundColor: colors.backgroundElement,
-      borderWidth: 2,
-      borderColor: colors.border,
-      borderRadius: 16,
-      padding: Spacing.three,
-      transform: [{ translateX: -4 }, { translateY: -4 }],
-    },
-    statusBadge: {
-      backgroundColor: colors.accentGreen,
-      borderWidth: 2,
-      borderColor: colors.border,
-      borderRadius: 8,
-      paddingHorizontal: Spacing.two,
-      paddingVertical: Spacing.half,
-      alignSelf: 'flex-start',
-      marginBottom: Spacing.one,
-    },
-    editBtnShadow: {
-      backgroundColor: colors.border,
-      borderRadius: 14,
-      marginTop: Spacing.two,
-      width: '100%',
-    },
-    editBtn: {
-      backgroundColor: colors.accentPink,
-      borderWidth: 2,
-      borderColor: colors.border,
-      borderRadius: 14,
-      paddingVertical: Spacing.two,
-      alignItems: 'center',
-      transform: [{ translateX: -3 }, { translateY: -3 }],
-    },
-    menuShadow: {
-      backgroundColor: colors.border,
-      borderRadius: 16,
-      marginTop: 60,
-      marginRight: Spacing.four,
-    },
-    menu: {
-      backgroundColor: colors.backgroundElement,
-      borderWidth: 3,
-      borderColor: colors.border,
-      borderRadius: 16,
-      minWidth: 160,
-      paddingVertical: Spacing.one,
-      transform: [{ translateX: -4 }, { translateY: -4 }],
-    },
-  });
+  }), [colors]);
 
   if (loadingProfile) {
     return (
@@ -245,15 +136,10 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
+
         <View style={styles.header}>
           <ThemedText style={dynamicStyles.headerText}>my profile</ThemedText>
-          <TouchableOpacity
-            style={[styles.iconBtn, { borderColor: colors.border }]}
-            onPress={() => setMenuVisible(true)}
-          >
-            <ThemedText style={styles.emojiText}>⚙️</ThemedText>
-          </TouchableOpacity>
+          <IconButton emoji="⚙️" onPress={() => setMenuVisible(true)} />
         </View>
 
         <Modal
@@ -263,70 +149,63 @@ export default function ProfileScreen() {
           onRequestClose={() => setMenuVisible(false)}
         >
           <Pressable style={styles.menuBackdrop} onPress={() => setMenuVisible(false)}>
-            <View style={dynamicStyles.menuShadow}>
-              <View style={dynamicStyles.menu}>
-                <TouchableOpacity style={styles.menuItem} onPress={handleLogOut}>
-                  <ThemedText style={styles.menuItemText}>🚪 Log Out</ThemedText>
-                </TouchableOpacity>
-              </View>
-            </View>
+            <ShadowSurface backgroundColor={colors.backgroundElement} radius={16} offset={4} wrapperStyle={styles.menuShadow} style={styles.menu}>
+              <TouchableOpacity style={styles.menuItem} onPress={handleLogOut}>
+                <ThemedText style={styles.menuItemText}>🚪 Log Out</ThemedText>
+              </TouchableOpacity>
+            </ShadowSurface>
           </Pressable>
         </Modal>
 
-        <View style={dynamicStyles.profileCardShadow}>
-          <View style={dynamicStyles.profileCard}>
-            <View style={dynamicStyles.avatarContainer}>
-              {profile?.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={dynamicStyles.avatarImage} resizeMode="cover" />
-              ) : null}
-            </View>
-
-            <ThemedText style={styles.userName}>
-              {(profile?.display_name || 'New Student').toUpperCase()}
-            </ThemedText>
-            
-            <View style={dynamicStyles.handleBadge}>
-              <ThemedText style={styles.handleText}>
-                @{profile?.username || 'username'}
-              </ThemedText>
-            </View>
-
-            <ThemedText style={styles.bioText}>
-              {profile?.bio || 'No bio yet.'}
-            </ThemedText>
-
-            {!!profile?.interests?.length && (
-              <View style={styles.interestsWrap}>
-                {profile.interests.map((tag) => (
-                  <View key={tag} style={[styles.interestChip, { borderColor: colors.border }]}>
-                    <ThemedText style={styles.interestChipText}>{tag}</ThemedText>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            <View style={dynamicStyles.editBtnShadow}>
-              <TouchableOpacity style={dynamicStyles.editBtn} onPress={() => router.push('/edit-profile')}>
-                <ThemedText style={styles.boldBtnText}>EDIT PROFILE</ThemedText>
-              </TouchableOpacity>
-            </View>
+        <ShadowSurface backgroundColor={colors.backgroundElement} radius={24} offset={6} wrapperStyle={styles.profileCardShadow} style={styles.profileCard}>
+          <View style={dynamicStyles.avatarContainer}>
+            {profile?.avatar_url ? (
+              <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} resizeMode="cover" />
+            ) : null}
           </View>
-        </View>
+
+          <ThemedText style={styles.userName}>
+            {(profile?.display_name || 'New Student').toUpperCase()}
+          </ThemedText>
+
+          <Badge label={`@${profile?.username || 'username'}`} backgroundColor={colors.accentCyan} radius={12} style={styles.handleBadge} />
+
+          <ThemedText style={styles.bioText}>
+            {profile?.bio || 'No bio yet.'}
+          </ThemedText>
+
+          {!!profile?.interests?.length && (
+            <View style={styles.interestsWrap}>
+              {profile.interests.map((tag) => (
+                <View key={tag} style={[styles.interestChip, { borderColor: colors.border }]}>
+                  <ThemedText style={styles.interestChipText}>{tag}</ThemedText>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <ShadowSurface
+            backgroundColor={colors.accentPink}
+            radius={14}
+            offset={3}
+            wrapperStyle={styles.editBtnShadow}
+            style={styles.editBtn}
+            onPress={() => router.push('/edit-profile')}
+          >
+            <ThemedText style={styles.boldBtnText}>EDIT PROFILE</ThemedText>
+          </ShadowSurface>
+        </ShadowSurface>
 
         <View style={styles.statsRow}>
-          <View style={dynamicStyles.statBoxShadow}>
-            <View style={dynamicStyles.statBox}>
-              <ThemedText style={styles.statNumber}>{savedEvents.length}</ThemedText>
-              <ThemedText style={styles.statLabel}>RSVPS</ThemedText>
-            </View>
-          </View>
+          <ShadowSurface backgroundColor={colors.backgroundElement} radius={16} offset={4} wrapperStyle={styles.statBoxShadow} style={styles.statBox}>
+            <ThemedText style={styles.statNumber}>{savedEvents.length}</ThemedText>
+            <ThemedText style={styles.statLabel}>RSVPS</ThemedText>
+          </ShadowSurface>
 
-          <View style={dynamicStyles.statBoxShadow}>
-            <View style={dynamicStyles.statBox}>
-              <ThemedText style={styles.statNumber}>{profile?.extracurriculars?.length ?? 0}</ThemedText>
-              <ThemedText style={styles.statLabel}>CLUBS</ThemedText>
-            </View>
-          </View>
+          <ShadowSurface backgroundColor={colors.backgroundElement} radius={16} offset={4} wrapperStyle={styles.statBoxShadow} style={styles.statBox}>
+            <ThemedText style={styles.statNumber}>{profile?.extracurriculars?.length ?? 0}</ThemedText>
+            <ThemedText style={styles.statLabel}>CLUBS</ThemedText>
+          </ShadowSurface>
         </View>
 
         <View style={styles.sectionHeader}>
@@ -340,14 +219,19 @@ export default function ProfileScreen() {
         )}
 
         {profile?.extracurriculars?.map((club, index) => (
-          <View key={`${club.name}-${index}`} style={dynamicStyles.clubTagShadow}>
-            <View style={[dynamicStyles.clubTag, { backgroundColor: clubColors[index % clubColors.length] }]}>
-              <ThemedText style={styles.clubNameText}>{club.name}</ThemedText>
-              <View style={[styles.roleBadge, { borderColor: colors.border }]}>
-                <ThemedText style={styles.roleText}>{club.role}</ThemedText>
-              </View>
+          <ShadowSurface
+            key={`${club.name}-${index}`}
+            backgroundColor={clubColors[index % clubColors.length]}
+            radius={14}
+            offset={3}
+            wrapperStyle={styles.clubTagShadow}
+            style={styles.clubTag}
+          >
+            <ThemedText style={styles.clubNameText}>{club.name}</ThemedText>
+            <View style={[styles.roleBadge, { borderColor: colors.border }]}>
+              <ThemedText style={styles.roleText}>{club.role}</ThemedText>
             </View>
-          </View>
+          </ShadowSurface>
         ))}
 
         <View style={styles.sectionHeader}>
@@ -361,20 +245,20 @@ export default function ProfileScreen() {
         )}
 
         {savedEvents.map((event) => (
-          <TouchableOpacity
+          <ShadowSurface
             key={event.id}
-            style={dynamicStyles.eventCardShadow}
-            activeOpacity={0.9}
+            backgroundColor={colors.backgroundElement}
+            radius={16}
+            offset={4}
+            borderWidth={2}
+            wrapperStyle={styles.eventCardShadow}
+            style={styles.eventCard}
             onPress={() => router.push(`/event-detail?id=${event.id}`)}
           >
-            <View style={dynamicStyles.eventCard}>
-              <View style={dynamicStyles.statusBadge}>
-                <ThemedText style={styles.statusText}>RSVP'D</ThemedText>
-              </View>
-              <ThemedText style={styles.eventTitle}>{event.title}</ThemedText>
-              <ThemedText style={styles.eventMeta}>Hosted by {event.host} • 📍 {event.location}</ThemedText>
-            </View>
-          </TouchableOpacity>
+            <Badge label="RSVP'D" backgroundColor={colors.accentGreen} style={styles.statusBadge} />
+            <ThemedText style={styles.eventTitle}>{event.title}</ThemedText>
+            <ThemedText style={styles.eventMeta}>Hosted by {event.host} • 📍 {event.location}</ThemedText>
+          </ShadowSurface>
         ))}
 
       </ScrollView>
@@ -398,23 +282,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.three,
   },
-  iconBtn: {
-    padding: Spacing.two,
-    borderRadius: 50,
-    borderWidth: 2,
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
-  emojiText: {
-    fontSize: 18,
-  },
+  profileCardShadow: { marginBottom: Spacing.four },
+  profileCard: { padding: Spacing.four, alignItems: 'center' },
+  handleBadge: { marginTop: Spacing.one, marginBottom: Spacing.two },
   userName: {
     fontSize: 22,
     fontWeight: '900',
     letterSpacing: -0.5,
-  },
-  handleText: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#000',
   },
   bioText: {
     fontSize: 13,
@@ -440,6 +318,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
   },
+  editBtnShadow: { marginTop: Spacing.two, width: '100%' },
+  editBtn: { paddingVertical: Spacing.two, alignItems: 'center' },
   boldBtnText: {
     fontWeight: '900',
     color: '#000',
@@ -451,6 +331,8 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     marginBottom: Spacing.four,
   },
+  statBoxShadow: { flex: 1 },
+  statBox: { paddingVertical: Spacing.two, alignItems: 'center' },
   statNumber: {
     fontSize: 20,
     fontWeight: '900',
@@ -474,6 +356,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: Spacing.two,
   },
+  clubTagShadow: { marginBottom: Spacing.two },
+  clubTag: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
   clubNameText: {
     fontSize: 14,
     fontWeight: '900',
@@ -491,11 +381,9 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#000',
   },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#000',
-  },
+  statusBadge: { marginBottom: Spacing.one },
+  eventCardShadow: { marginBottom: Spacing.two },
+  eventCard: { padding: Spacing.three },
   eventTitle: {
     fontSize: 16,
     fontWeight: '900',
@@ -510,6 +398,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'flex-end',
   },
+  menuShadow: { marginTop: 60, marginRight: Spacing.four },
+  menu: { minWidth: 160, paddingVertical: Spacing.one },
   menuItem: {
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,

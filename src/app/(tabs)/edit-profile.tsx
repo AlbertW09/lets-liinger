@@ -1,12 +1,18 @@
-import { ThemedText } from '@/components/themed-text';
-import { Colors, Spacing } from '@/constants/theme';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, useColorScheme, View,
+  ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { addClub, Club, clubLabel, fetchClubs } from '../../lib/clubs';
+
+import { ClubChipPicker } from '@/components/club-chip-picker';
+import { ThemedText } from '@/components/themed-text';
+import { Chip } from '@/components/ui/chip';
+import { ShadowSurface } from '@/components/ui/shadow-surface';
+import { TextField } from '@/components/ui/text-field';
+import { Spacing } from '@/constants/theme';
+import { useClubs } from '@/hooks/use-clubs';
+import { useTheme } from '@/hooks/use-theme';
 import { pickImageFile, uploadAvatar } from '../../lib/avatar';
 import { supabase } from '../../supabaseClient';
 
@@ -17,10 +23,9 @@ const INTEREST_OPTIONS = [
 ];
 
 export default function EditProfileScreen() {
-  const systemScheme = useColorScheme();
-  const scheme = systemScheme === 'unspecified' ? 'light' : systemScheme;
-  const colors = Colors[scheme];
+  const colors = useTheme();
   const router = useRouter();
+  const { clubs, create: createClub } = useClubs();
 
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
@@ -32,13 +37,8 @@ export default function EditProfileScreen() {
   const [interests, setInterests] = useState<string[]>([]);
   const [extracurriculars, setExtracurriculars] = useState<{ name: string; role: string }[]>([]);
 
-  // Clubs list + the in-progress "add a club to my profile" entry
-  const [clubs, setClubs] = useState<Club[]>([]);
   const [pickedClub, setPickedClub] = useState('');
   const [newRole, setNewRole] = useState('');
-  const [creatingClub, setCreatingClub] = useState(false);
-  const [createName, setCreateName] = useState('');
-  const [createEmoji, setCreateEmoji] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -51,7 +51,6 @@ export default function EditProfileScreen() {
         return;
       }
       setUserId(user.id);
-      setClubs(await fetchClubs());
 
       const { data, error } = await supabase
         .from('profiles')
@@ -85,19 +84,6 @@ export default function EditProfileScreen() {
 
   function toggleInterest(tag: string) {
     setInterests(prev => (prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]));
-  }
-
-  async function handleCreateClub() {
-    const created = await addClub(createName, createEmoji);
-    if (created) {
-      setClubs(prev =>
-        prev.some(c => c.id === created.id) ? prev : [...prev, created].sort((a, b) => a.name.localeCompare(b.name))
-      );
-      setPickedClub(clubLabel(created));
-      setCreateName('');
-      setCreateEmoji('');
-      setCreatingClub(false);
-    }
   }
 
   function addExtracurricular() {
@@ -157,60 +143,9 @@ export default function EditProfileScreen() {
     router.replace('/profile');
   }
 
-  const dynamicStyles = StyleSheet.create({
-    safeArea: { flex: 1, backgroundColor: colors.background },
-    headerText: {
-      color: colors.text, fontFamily: 'ui-rounded', fontWeight: '900',
-      fontSize: 24, letterSpacing: -1,
-    },
-    label: {
-      fontSize: 12, fontWeight: '900', color: colors.accentCyan,
-      marginBottom: Spacing.two, marginTop: Spacing.three, letterSpacing: 0.5,
-    },
-    input: {
-      backgroundColor: colors.backgroundElement, color: colors.text,
-      padding: Spacing.three, borderRadius: 12, borderWidth: 2,
-      borderColor: colors.border, fontSize: 15,
-    },
-    at: { color: colors.accentYellow, fontSize: 20, fontWeight: '900', marginRight: Spacing.two },
-    chip: {
-      paddingVertical: 9, paddingHorizontal: Spacing.three, borderRadius: 999,
-      borderWidth: 2, borderColor: colors.border, backgroundColor: colors.backgroundElement,
-    },
-    chipSelected: { backgroundColor: colors.accentPink },
-    avatarCircle: {
-      width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: colors.border,
-      backgroundColor: colors.accentYellow, justifyContent: 'center', alignItems: 'center', overflow: 'hidden',
-    },
-    avatarImg: { width: '100%', height: '100%' },
-    changeAvatarBtn: {
-      marginTop: Spacing.two, borderWidth: 2, borderColor: colors.border, borderRadius: 10,
-      paddingVertical: Spacing.one, paddingHorizontal: Spacing.three, backgroundColor: colors.accentCyan,
-    },
-    clubRow: {
-      backgroundColor: colors.backgroundElement, borderWidth: 2, borderColor: colors.border,
-      borderRadius: 12,
-    },
-    removeText: { color: colors.accentPink, fontWeight: '900', fontSize: 16 },
-    addBtn: {
-      backgroundColor: colors.accentGreen, borderWidth: 2, borderColor: colors.border,
-      borderRadius: 12, paddingVertical: Spacing.two, alignItems: 'center', marginTop: Spacing.two,
-    },
-    createClubBtn: {
-      backgroundColor: colors.accentCyan, borderWidth: 2, borderColor: colors.border,
-      borderRadius: 12, paddingHorizontal: Spacing.three, justifyContent: 'center', alignItems: 'center',
-    },
-    saveBtnShadow: { backgroundColor: colors.border, borderRadius: 14, marginTop: Spacing.four },
-    saveBtn: {
-      backgroundColor: colors.accentYellow, borderWidth: 2, borderColor: colors.border,
-      borderRadius: 14, paddingVertical: Spacing.three, alignItems: 'center',
-      transform: [{ translateX: -3 }, { translateY: -3 }],
-    },
-  });
-
   if (loadingProfile) {
     return (
-      <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color={colors.text} />
         </View>
@@ -219,189 +154,164 @@ export default function EditProfileScreen() {
   }
 
   return (
-    <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.replace('/profile')}>
-            <ThemedText style={dynamicStyles.headerText}>‹ back</ThemedText>
+            <ThemedText style={[styles.headerText, { color: colors.text }]}>‹ back</ThemedText>
           </TouchableOpacity>
         </View>
 
-        <ThemedText style={dynamicStyles.headerText}>Edit profile</ThemedText>
+        <ThemedText style={[styles.headerText, { color: colors.text }]}>Edit profile</ThemedText>
 
         <View style={styles.avatarWrap}>
-          <TouchableOpacity style={dynamicStyles.avatarCircle} onPress={handlePickAvatar} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={[styles.avatarCircle, { borderColor: colors.border, backgroundColor: colors.accentYellow }]}
+            onPress={handlePickAvatar}
+            activeOpacity={0.8}
+          >
             {uploadingAvatar ? (
               <ActivityIndicator color="#000" />
             ) : avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={dynamicStyles.avatarImg} resizeMode="cover" />
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImg} resizeMode="cover" />
             ) : (
               <ThemedText style={styles.avatarPlaceholder}>📷</ThemedText>
             )}
           </TouchableOpacity>
-          <TouchableOpacity style={dynamicStyles.changeAvatarBtn} onPress={handlePickAvatar}>
+          <TouchableOpacity
+            style={[styles.changeAvatarBtn, { borderColor: colors.border, backgroundColor: colors.accentCyan }]}
+            onPress={handlePickAvatar}
+          >
             <ThemedText style={styles.smallBtnText}>{avatarUrl ? 'Change photo' : 'Add photo'}</ThemedText>
           </TouchableOpacity>
         </View>
 
-        <ThemedText style={dynamicStyles.label}>Your name</ThemedText>
-        <TextInput
-          style={dynamicStyles.input}
-          placeholder="Alex Rivera"
-          placeholderTextColor={colors.textSecondary}
-          value={displayName}
-          onChangeText={setDisplayName}
-        />
+        <TextField label="Your name" placeholder="Alex Rivera" value={displayName} onChangeText={setDisplayName} />
 
-        <ThemedText style={dynamicStyles.label}>Username</ThemedText>
+        <ThemedText style={styles.label} themeColor="accentCyan">Username</ThemedText>
         <View style={styles.usernameRow}>
-          <ThemedText style={dynamicStyles.at}>@</ThemedText>
-          <TextInput
-            style={[dynamicStyles.input, styles.usernameInput]}
+          <ThemedText style={[styles.at, { color: colors.accentYellow }]}>@</ThemedText>
+          <TextField
+            containerStyle={styles.flex1}
             placeholder="alex_y2k"
-            placeholderTextColor={colors.textSecondary}
             autoCapitalize="none"
             value={username}
             onChangeText={setUsername}
           />
         </View>
 
-        <ThemedText style={dynamicStyles.label}>Bio</ThemedText>
-        <TextInput
-          style={[dynamicStyles.input, styles.bioInput]}
+        <TextField
+          label="Bio"
           placeholder="Senior @ Campus | Music & retro gaming"
-          placeholderTextColor={colors.textSecondary}
           multiline
           maxLength={160}
+          style={styles.bioInput}
           value={bio}
           onChangeText={setBio}
         />
         <ThemedText style={styles.counter}>{bio.length}/160</ThemedText>
 
-        <ThemedText style={dynamicStyles.label}>What are you into?</ThemedText>
+        <ThemedText style={styles.label} themeColor="accentCyan">What are you into?</ThemedText>
         <View style={styles.chipWrap}>
-          {INTEREST_OPTIONS.map(tag => {
-            const selected = interests.includes(tag);
-            return (
-              <TouchableOpacity
-                key={tag}
-                style={[dynamicStyles.chip, selected && dynamicStyles.chipSelected]}
-                onPress={() => toggleInterest(tag)}
-              >
-                <ThemedText style={styles.chipText}>{tag}</ThemedText>
-              </TouchableOpacity>
-            );
-          })}
+          {INTEREST_OPTIONS.map(tag => (
+            <Chip key={tag} label={tag} selected={interests.includes(tag)} onPress={() => toggleInterest(tag)} />
+          ))}
         </View>
 
-        <ThemedText style={dynamicStyles.label}>My clubs</ThemedText>
+        <ThemedText style={styles.label} themeColor="accentCyan">My clubs</ThemedText>
         {extracurriculars.map((item, index) => (
-          <View key={`${item.name}-${index}`} style={[dynamicStyles.clubRow, styles.clubRow]}>
+          <View key={`${item.name}-${index}`} style={[styles.clubRow, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
             <ThemedText style={styles.clubRowText}>
               {item.name} <ThemedText style={styles.clubRowRole} themeColor="textSecondary">— {item.role}</ThemedText>
             </ThemedText>
             <TouchableOpacity onPress={() => removeExtracurricular(index)}>
-              <ThemedText style={dynamicStyles.removeText}>✕</ThemedText>
+              <ThemedText style={[styles.removeText, { color: colors.accentPink }]}>✕</ThemedText>
             </TouchableOpacity>
           </View>
         ))}
 
         <ThemedText style={styles.subLabel} themeColor="textSecondary">Pick a club</ThemedText>
-        <View style={styles.chipWrap}>
-          {clubs.map(c => {
-            const label = clubLabel(c);
-            const selected = pickedClub === label;
-            return (
-              <TouchableOpacity
-                key={c.id}
-                style={[dynamicStyles.chip, selected && dynamicStyles.chipSelected]}
-                onPress={() => setPickedClub(selected ? '' : label)}
-              >
-                <ThemedText style={styles.chipText}>{label}</ThemedText>
-              </TouchableOpacity>
-            );
-          })}
-          <TouchableOpacity
-            style={[dynamicStyles.chip, styles.dashed]}
-            onPress={() => setCreatingClub(v => !v)}
-          >
-            <ThemedText style={styles.chipText}>➕ New club</ThemedText>
-          </TouchableOpacity>
-        </View>
+        <ClubChipPicker
+          clubs={clubs}
+          isSelected={(label) => pickedClub === label}
+          onToggle={(label) => setPickedClub(pickedClub === label ? '' : label)}
+          onClubCreated={(created) => setPickedClub(`${created.emoji ? `${created.emoji} ` : ''}${created.name}`)}
+          createClub={createClub}
+        />
 
-        {creatingClub && (
-          <View style={styles.addClubRow}>
-            <TextInput
-              style={[dynamicStyles.input, styles.emojiInput]}
-              placeholder="🎸"
-              placeholderTextColor={colors.textSecondary}
-              value={createEmoji}
-              onChangeText={setCreateEmoji}
-              maxLength={2}
-            />
-            <TextInput
-              style={[dynamicStyles.input, styles.flex1]}
-              placeholder="New club name"
-              placeholderTextColor={colors.textSecondary}
-              value={createName}
-              onChangeText={setCreateName}
-            />
-            <TouchableOpacity style={dynamicStyles.createClubBtn} onPress={handleCreateClub}>
-              <ThemedText style={styles.smallBtnText}>Add</ThemedText>
-            </TouchableOpacity>
-          </View>
-        )}
+        <TextField placeholder="Your role (e.g. Member)" containerStyle={styles.roleField} value={newRole} onChangeText={setNewRole} />
 
-        <View style={styles.addClubRow}>
-          <TextInput
-            style={[dynamicStyles.input, styles.flex1]}
-            placeholder="Your role (e.g. Member)"
-            placeholderTextColor={colors.textSecondary}
-            value={newRole}
-            onChangeText={setNewRole}
-          />
-        </View>
-        <TouchableOpacity style={dynamicStyles.addBtn} onPress={addExtracurricular}>
+        <ShadowSurface
+          backgroundColor={colors.accentGreen}
+          radius={12}
+          offset={2}
+          wrapperStyle={styles.addBtnShadow}
+          style={styles.addBtn}
+          onPress={addExtracurricular}
+        >
           <ThemedText style={styles.addBtnText}>+ ADD CLUB TO PROFILE</ThemedText>
-        </TouchableOpacity>
+        </ShadowSurface>
 
         {errorMsg ? <ThemedText style={styles.error}>{errorMsg}</ThemedText> : null}
 
-        <View style={dynamicStyles.saveBtnShadow}>
-          <TouchableOpacity style={dynamicStyles.saveBtn} onPress={handleSave} disabled={saving}>
-            <ThemedText style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save changes'}</ThemedText>
-          </TouchableOpacity>
-        </View>
+        <ShadowSurface
+          backgroundColor={colors.accentYellow}
+          radius={14}
+          offset={3}
+          wrapperStyle={styles.saveBtnShadow}
+          style={styles.saveBtn}
+          onPress={handleSave}
+          disabled={saving}
+        >
+          <ThemedText style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save changes'}</ThemedText>
+        </ShadowSurface>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1 },
   content: { padding: Spacing.four, paddingBottom: 80 },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { marginBottom: Spacing.three },
+  headerText: { fontFamily: 'ui-rounded', fontWeight: '900', fontSize: 24, letterSpacing: -1 },
   avatarWrap: { alignItems: 'center', marginTop: Spacing.three },
+  avatarCircle: {
+    width: 100, height: 100, borderRadius: 50, borderWidth: 3,
+    justifyContent: 'center', alignItems: 'center', overflow: 'hidden',
+  },
+  avatarImg: { width: '100%', height: '100%' },
   avatarPlaceholder: { fontSize: 32 },
+  changeAvatarBtn: {
+    marginTop: Spacing.two, borderWidth: 2, borderRadius: 10,
+    paddingVertical: Spacing.one, paddingHorizontal: Spacing.three,
+  },
   smallBtnText: { fontWeight: '900', fontSize: 12, color: '#000' },
+  label: {
+    fontSize: 12, fontWeight: '900', marginBottom: Spacing.two, marginTop: Spacing.three, letterSpacing: 0.5,
+  },
   usernameRow: { flexDirection: 'row', alignItems: 'center' },
-  usernameInput: { flex: 1 },
+  at: { fontSize: 20, fontWeight: '900', marginRight: Spacing.two },
+  flex1: { flex: 1 },
   bioInput: { height: 90, textAlignVertical: 'top' },
   counter: { fontSize: 11, opacity: 0.6, textAlign: 'right', marginTop: Spacing.one },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  chipText: { fontWeight: 'bold', fontSize: 13 },
-  dashed: { borderStyle: 'dashed' },
   subLabel: { fontSize: 11, fontWeight: '800', marginTop: Spacing.three, marginBottom: Spacing.two },
   clubRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    borderWidth: 2, borderRadius: 12,
     paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, marginBottom: Spacing.two,
   },
   clubRowText: { fontWeight: '900', fontSize: 14 },
   clubRowRole: { fontWeight: '600', fontSize: 13 },
-  addClubRow: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.two },
-  emojiInput: { width: 56, textAlign: 'center' },
-  flex1: { flex: 1 },
+  removeText: { fontWeight: '900', fontSize: 16 },
+  roleField: { marginTop: Spacing.two },
+  addBtnShadow: { marginTop: Spacing.two },
+  addBtn: { paddingVertical: Spacing.two, alignItems: 'center' },
   addBtnText: { fontWeight: '900', fontSize: 13, letterSpacing: 0.5, color: '#000' },
+  saveBtnShadow: { marginTop: Spacing.four },
+  saveBtn: { paddingVertical: Spacing.three, alignItems: 'center' },
   saveBtnText: { textAlign: 'center', fontWeight: '900', color: '#000', fontSize: 16 },
   error: { color: '#ff6b6b', marginTop: Spacing.three, textAlign: 'center' },
 });

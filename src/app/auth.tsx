@@ -1,22 +1,21 @@
-import { ThemedText } from '@/components/themed-text';
-import { Colors, Spacing } from '@/constants/theme';
 import { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  TextInput,
-  TouchableOpacity,
   View,
-  useColorScheme,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { ThemedText } from '@/components/themed-text';
+import { ShadowSurface } from '@/components/ui/shadow-surface';
+import { TextField } from '@/components/ui/text-field';
+import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '../supabaseClient';
 
 export default function AuthScreen() {
-  const systemScheme = useColorScheme();
-  const scheme = systemScheme === 'unspecified' ? 'light' : systemScheme;
-  const colors = Colors[scheme];
+  const colors = useTheme();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -51,87 +50,49 @@ export default function AuthScreen() {
     setLoading(false);
   }
 
-  const dynamicStyles = StyleSheet.create({
-    safeArea: { flex: 1, backgroundColor: colors.background },
-    title: {
-      color: colors.text, fontFamily: 'Helvetica', fontWeight: '900',
-      fontSize: 40, letterSpacing: -1, textAlign: 'center',
-    },
-    subtitle: {
-      textAlign: 'center', marginTop: Spacing.two, marginBottom: Spacing.six,
-    },
-    label: {
-      fontSize: 12, fontWeight: '900', color: colors.accentCyan,
-      marginBottom: Spacing.two, marginTop: Spacing.three, letterSpacing: 0.5,
-    },
-    input: {
-      backgroundColor: colors.backgroundElement, color: colors.text, padding: Spacing.three,
-      borderRadius: 12, borderWidth: 2, borderColor: colors.border, fontSize: 15,
-    },
-    signInBtnShadow: { backgroundColor: colors.border, borderRadius: 14, marginTop: Spacing.five },
-    signInBtn: {
-      backgroundColor: colors.accentYellow, borderWidth: 2, borderColor: colors.border,
-      borderRadius: 14, paddingVertical: Spacing.three, alignItems: 'center',
-      transform: [{ translateX: -3 }, { translateY: -3 }],
-    },
-    signUpBtnShadow: { backgroundColor: colors.border, borderRadius: 14, marginTop: Spacing.three },
-    signUpBtn: {
-      backgroundColor: colors.accentCyan, borderWidth: 2, borderColor: colors.border,
-      borderRadius: 14, paddingVertical: Spacing.three, alignItems: 'center',
-      transform: [{ translateX: -3 }, { translateY: -3 }],
-    },
-  });
-
   return (
-    <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right', 'bottom']}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.content}>
-          <ThemedText style={dynamicStyles.title}>LetsLiinger</ThemedText>
-          <ThemedText style={dynamicStyles.subtitle} themeColor="textSecondary">
+          <ThemedText style={[styles.title, { color: colors.text }]}>LetsLiinger</ThemedText>
+          <ThemedText style={styles.subtitle} themeColor="textSecondary">
             See what's happenin
           </ThemedText>
 
-          <ThemedText style={dynamicStyles.label}>Email</ThemedText>
-          <TextInput
-            style={dynamicStyles.input}
-            placeholder="you@email.com"
-            placeholderTextColor={colors.textSecondary}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            value={email}
-            onChangeText={setEmail}
-          />
-
-          <ThemedText style={dynamicStyles.label}>Password</ThemedText>
-          <TextInput
-            style={dynamicStyles.input}
-            placeholder=""
-            placeholderTextColor={colors.textSecondary}
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
+          <TextField label="Email" placeholder="you@email.com" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" value={email} onChangeText={setEmail} />
+          <TextField label="Password" secureTextEntry value={password} onChangeText={setPassword} />
 
           {errorMsg ? <ThemedText style={styles.error}>{errorMsg}</ThemedText> : null}
           {infoMsg ? (
             <ThemedText style={styles.info} themeColor="accentCyan">{infoMsg}</ThemedText>
           ) : null}
 
-          <View style={dynamicStyles.signInBtnShadow}>
-            <TouchableOpacity style={dynamicStyles.signInBtn} onPress={handleSignIn} disabled={loading}>
-              <ThemedText style={styles.buttonText}>{loading ? '...' : 'Sign In'}</ThemedText>
-            </TouchableOpacity>
-          </View>
+          <ShadowSurface
+            backgroundColor={colors.accentYellow}
+            radius={14}
+            offset={3}
+            wrapperStyle={styles.signInShadow}
+            style={styles.btn}
+            onPress={handleSignIn}
+            disabled={loading}
+          >
+            <ThemedText style={styles.buttonText}>{loading ? '...' : 'Sign In'}</ThemedText>
+          </ShadowSurface>
 
-          <View style={dynamicStyles.signUpBtnShadow}>
-            <TouchableOpacity style={dynamicStyles.signUpBtn} onPress={handleSignUp} disabled={loading}>
-              <ThemedText style={styles.buttonText}>Create Account</ThemedText>
-            </TouchableOpacity>
-          </View>
+          <ShadowSurface
+            backgroundColor={colors.accentCyan}
+            radius={14}
+            offset={3}
+            wrapperStyle={styles.signUpShadow}
+            style={styles.btn}
+            onPress={handleSignUp}
+            disabled={loading}
+          >
+            <ThemedText style={styles.buttonText}>Create Account</ThemedText>
+          </ShadowSurface>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -139,8 +100,17 @@ export default function AuthScreen() {
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1 },
   flex: { flex: 1 },
   content: { flex: 1, justifyContent: 'center', padding: Spacing.four },
+  title: {
+    fontFamily: 'Helvetica', fontWeight: '900',
+    fontSize: 40, letterSpacing: -1, textAlign: 'center',
+  },
+  subtitle: { textAlign: 'center', marginTop: Spacing.two, marginBottom: Spacing.six },
+  btn: { paddingVertical: Spacing.three, alignItems: 'center' },
+  signInShadow: { marginTop: Spacing.five },
+  signUpShadow: { marginTop: Spacing.three },
   buttonText: { fontWeight: '900', color: '#000', fontSize: 14 },
   error: { color: '#ff6b6b', fontWeight: '700', marginTop: Spacing.three, textAlign: 'center' },
   info: { fontWeight: '700', marginTop: Spacing.three, textAlign: 'center' },

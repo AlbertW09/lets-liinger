@@ -1,15 +1,19 @@
-import { ThemedText } from '@/components/themed-text';
-import { Colors, Spacing } from '@/constants/theme';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
     ScrollView,
     StyleSheet,
     TouchableOpacity,
     View,
-    useColorScheme
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { ThemedText } from '@/components/themed-text';
+import { Badge } from '@/components/ui/badge';
+import { IconButton } from '@/components/ui/icon-button';
+import { ShadowSurface } from '@/components/ui/shadow-surface';
+import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '../../supabaseClient';
 
 interface CalendarEvent {
@@ -23,9 +27,7 @@ interface CalendarEvent {
 }
 
 export default function CalendarScreen() {
-  const systemScheme = useColorScheme();
-  const scheme = systemScheme === 'unspecified' ? 'light' : systemScheme;
-  const colors = Colors[scheme];
+  const colors = useTheme();
 
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -106,7 +108,7 @@ export default function CalendarScreen() {
 
   const selectedEvents = scheduledEvents.filter(e => e.date === selectedDateStr);
 
-  const dynamicStyles = StyleSheet.create({
+  const dynamicStyles = useMemo(() => StyleSheet.create({
     safeArea: {
       flex: 1,
       backgroundColor: colors.background,
@@ -117,19 +119,6 @@ export default function CalendarScreen() {
       fontWeight: '900',
       fontSize: 28,
       letterSpacing: -1,
-    },
-    calendarCardShadow: {
-      backgroundColor: colors.border,
-      borderRadius: 20,
-      marginBottom: Spacing.four,
-    },
-    calendarCard: {
-      backgroundColor: colors.backgroundElement,
-      borderWidth: 3,
-      borderColor: colors.border,
-      borderRadius: 20,
-      padding: Spacing.three,
-      transform: [{ translateX: -5 }, { translateY: -5 }],
     },
     navBtn: {
       backgroundColor: colors.accentYellow,
@@ -166,29 +155,7 @@ export default function CalendarScreen() {
       marginLeft: -14,
       backgroundColor: colors.accentPink,
     },
-    eventCardShadow: {
-      backgroundColor: colors.border,
-      borderRadius: 18,
-      marginBottom: Spacing.three,
-    },
-    eventCard: {
-      backgroundColor: colors.backgroundElement,
-      borderWidth: 3,
-      borderColor: colors.border,
-      borderRadius: 18,
-      padding: Spacing.three,
-      transform: [{ translateX: -4 }, { translateY: -4 }],
-    },
-    badge: {
-      borderWidth: 2,
-      borderColor: colors.border,
-      borderRadius: 8,
-      paddingHorizontal: Spacing.two,
-      paddingVertical: 2,
-      alignSelf: 'flex-start',
-      marginBottom: Spacing.two,
-    }
-  });
+  }), [colors]);
 
   const renderGrid = () => {
     const TOTAL_SLOTS = 42; // Always 6 weeks (6 rows * 7 days = 42 cells)
@@ -222,9 +189,9 @@ export default function CalendarScreen() {
 
       const dateStr = getFormattedDate(cellYear, cellMonth, cellDay);
       const isSelected = dateStr === selectedDateStr;
-      const isToday = 
-        cellDay === today.getDate() && 
-        cellMonth === today.getMonth() && 
+      const isToday =
+        cellDay === today.getDate() &&
+        cellMonth === today.getMonth() &&
         cellYear === today.getFullYear();
 
       const hasEvents = scheduledEvents.some(e => e.date === dateStr);
@@ -265,45 +232,39 @@ export default function CalendarScreen() {
   return (
     <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
+
         <View style={styles.header}>
           <ThemedText style={dynamicStyles.headerText}>event calendar</ThemedText>
-          <TouchableOpacity style={[styles.iconBtn, { borderColor: colors.border }]}>
-            <ThemedText style={styles.emojiText}>⚡️</ThemedText>
-          </TouchableOpacity>
+          <IconButton emoji="⚡️" />
         </View>
 
-        <View style={dynamicStyles.calendarCardShadow}>
-          <View style={dynamicStyles.calendarCard}>
-            
-            <View style={styles.monthHeader}>
-              <TouchableOpacity onPress={prevMonth} style={dynamicStyles.navBtn}>
-                <ThemedText style={styles.boldText}>◀</ThemedText>
-              </TouchableOpacity>
+        <ShadowSurface backgroundColor={colors.backgroundElement} radius={20} offset={5} wrapperStyle={styles.calendarShadow} style={styles.calendarCard}>
+          <View style={styles.monthHeader}>
+            <TouchableOpacity onPress={prevMonth} style={dynamicStyles.navBtn}>
+              <ThemedText style={styles.boldText}>◀</ThemedText>
+            </TouchableOpacity>
 
-              <ThemedText style={styles.monthTitle}>
-                {monthNames[month]} {year}
-              </ThemedText>
+            <ThemedText style={styles.monthTitle}>
+              {monthNames[month]} {year}
+            </ThemedText>
 
-              <TouchableOpacity onPress={nextMonth} style={dynamicStyles.navBtn}>
-                <ThemedText style={styles.boldText}>▶</ThemedText>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.dayLabelsRow}>
-              {dayLabels.map((lbl, idx) => (
-                <View key={idx} style={dynamicStyles.dayCell}>
-                  <ThemedText style={styles.dayLabelText}>{lbl}</ThemedText>
-                </View>
-              ))}
-            </View>
-
-            <View style={styles.gridContainer}>
-              {renderGrid()}
-            </View>
-
+            <TouchableOpacity onPress={nextMonth} style={dynamicStyles.navBtn}>
+              <ThemedText style={styles.boldText}>▶</ThemedText>
+            </TouchableOpacity>
           </View>
-        </View>
+
+          <View style={styles.dayLabelsRow}>
+            {dayLabels.map((lbl, idx) => (
+              <View key={idx} style={dynamicStyles.dayCell}>
+                <ThemedText style={styles.dayLabelText}>{lbl}</ThemedText>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.gridContainer}>
+            {renderGrid()}
+          </View>
+        </ShadowSurface>
 
         <View style={styles.sectionHeader}>
           <ThemedText style={styles.sectionTitle}>
@@ -312,35 +273,29 @@ export default function CalendarScreen() {
         </View>
 
         {selectedEvents.length === 0 ? (
-          <View style={dynamicStyles.eventCardShadow}>
-            <View style={dynamicStyles.eventCard}>
-              <ThemedText style={styles.noEventsText}>
-                NO EVENTS LINED UP FOR THIS DAY YET! 😴
-              </ThemedText>
-            </View>
-          </View>
+          <ShadowSurface backgroundColor={colors.backgroundElement} radius={18} offset={4} wrapperStyle={styles.eventCardShadow} style={styles.eventCard}>
+            <ThemedText style={styles.noEventsText}>
+              NO EVENTS LINED UP FOR THIS DAY YET! 😴
+            </ThemedText>
+          </ShadowSurface>
         ) : (
           selectedEvents.map((evt) => (
-            <View key={evt.id} style={dynamicStyles.eventCardShadow}>
-              <View style={dynamicStyles.eventCard}>
-                <View style={[dynamicStyles.badge, { backgroundColor: evt.color }]}>
-                  <ThemedText style={styles.badgeText}>{evt.host}</ThemedText>
+            <ShadowSurface key={evt.id} backgroundColor={colors.backgroundElement} radius={18} offset={4} wrapperStyle={styles.eventCardShadow} style={styles.eventCard}>
+              <Badge label={evt.host} backgroundColor={evt.color} style={styles.hostBadge} />
+
+              <ThemedText style={styles.eventTitle}>{evt.title}</ThemedText>
+
+              <View style={styles.detailsRow}>
+                <View style={styles.detailItem}>
+                  <ThemedText style={styles.detailEmoji}>🕒</ThemedText>
+                  <ThemedText style={styles.detailText}>{evt.time}</ThemedText>
                 </View>
-
-                <ThemedText style={styles.eventTitle}>{evt.title}</ThemedText>
-
-                <View style={styles.detailsRow}>
-                  <View style={styles.detailItem}>
-                    <ThemedText style={styles.detailEmoji}>🕒</ThemedText>
-                    <ThemedText style={styles.detailText}>{evt.time}</ThemedText>
-                  </View>
-                  <View style={styles.detailItem}>
-                    <ThemedText style={styles.detailEmoji}>📍</ThemedText>
-                    <ThemedText style={styles.detailText}>{evt.location}</ThemedText>
-                  </View>
+                <View style={styles.detailItem}>
+                  <ThemedText style={styles.detailEmoji}>📍</ThemedText>
+                  <ThemedText style={styles.detailText}>{evt.location}</ThemedText>
                 </View>
               </View>
-            </View>
+            </ShadowSurface>
           ))
         )}
 
@@ -360,19 +315,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.three,
   },
-  iconBtn: {
-    padding: Spacing.two,
-    borderRadius: 50,
-    borderWidth: 2,
-  },
-  emojiText: {
-    fontSize: 18,
-  },
   boldText: {
     fontWeight: '900',
     color: '#000',
     fontSize: 14,
   },
+  calendarShadow: { marginBottom: Spacing.four },
+  calendarCard: { padding: Spacing.three },
+  eventCardShadow: { marginBottom: Spacing.three },
+  eventCard: { padding: Spacing.three },
+  hostBadge: { borderRadius: 8, marginBottom: Spacing.two },
   monthHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -405,11 +357,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontSize: 15,
     letterSpacing: 0.5,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#000',
   },
   eventTitle: {
     fontSize: 18,

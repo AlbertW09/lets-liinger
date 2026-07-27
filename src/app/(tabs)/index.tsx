@@ -1,22 +1,23 @@
-import { DateTimeField } from '@/components/date-time-field';
-import { ThemedText } from '@/components/themed-text';
-import { Colors, Spacing } from '@/constants/theme';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
   View,
-  useColorScheme,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { EventFormModal, EventFormSubmitValues } from '@/components/event-form-modal';
+import { ThemedText } from '@/components/themed-text';
+import { Chip } from '@/components/ui/chip';
+import { IconButton } from '@/components/ui/icon-button';
+import { ShadowSurface } from '@/components/ui/shadow-surface';
+import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '../../supabaseClient';
-import { addClub, Club, clubLabel, fetchClubs } from '../../lib/clubs';
-import { PlaceResult, searchPlaces } from '../../lib/places';
 
 type SortMode = 'popular' | 'recent' | 'nearby';
 
@@ -89,9 +90,7 @@ function getCurrentCoords(): Promise<Coords | null> {
 }
 
 export default function HomeScreen() {
-  const systemScheme = useColorScheme();
-  const scheme = systemScheme === 'unspecified' ? 'light' : systemScheme;
-  const colors = Colors[scheme];
+  const colors = useTheme();
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -100,29 +99,7 @@ export default function HomeScreen() {
   const [userCoords, setUserCoords] = useState<Coords | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('recent');
-
-  // Create-event modal state
   const [createVisible, setCreateVisible] = useState(false);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [pickedDate, setPickedDate] = useState<Date | null>(null);
-  const [pickedTime, setPickedTime] = useState<Date | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState('');
-
-  // Location place-picker (Nominatim)
-  const [placeQuery, setPlaceQuery] = useState('');
-  const [placeResults, setPlaceResults] = useState<PlaceResult[]>([]);
-  const [placeSelected, setPlaceSelected] = useState<PlaceResult | null>(null);
-  const [searchingPlace, setSearchingPlace] = useState(false);
-  const placeTimer = useRef<any>(null);
-
-  // Hosting club (from the shared clubs list)
-  const [host, setHost] = useState('');
-  const [clubs, setClubs] = useState<Club[]>([]);
-  const [addingClub, setAddingClub] = useState(false);
-  const [newClubName, setNewClubName] = useState('');
-  const [newClubEmoji, setNewClubEmoji] = useState('');
 
   const fetchAll = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -207,47 +184,22 @@ export default function HomeScreen() {
     fetchAll();
   }
 
-  async function openCreate() {
-    setCreateVisible(true);
-    setClubs(await fetchClubs());
-  }
+  async function handleCreateSubmit(values: EventFormSubmitValues) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: 'You need to be signed in.' };
 
-  async function handleAddClub() {
-    const created = await addClub(newClubName, newClubEmoji);
-    if (created) {
-      setClubs((prev) =>
-        prev.some((c) => c.id === created.id)
-          ? prev
-          : [...prev, created].sort((a, b) => a.name.localeCompare(b.name))
-      );
-      setHost(clubLabel(created));
-      setNewClubName('');
-      setNewClubEmoji('');
-      setAddingClub(false);
-    }
-  }
+    const { error } = await supabase.from('events').insert({
+      title: values.title,
+      description: values.description || null,
+      location: values.place.name,
+      event_time: values.eventTimeIso,
+      created_by: user.id,
+      host: values.host || null,
+      latitude: values.place.lat,
+      longitude: values.place.lng,
+    });
 
-  function onPlaceQueryChange(text: string) {
-    setPlaceQuery(text);
-    setPlaceSelected(null); // editing invalidates a prior selection
-    if (placeTimer.current) clearTimeout(placeTimer.current);
-    if (text.trim().length < 3) {
-      setPlaceResults([]);
-      setSearchingPlace(false);
-      return;
-    }
-    setSearchingPlace(true);
-    placeTimer.current = setTimeout(async () => {
-      const results = await searchPlaces(text.trim());
-      setPlaceResults(results);
-      setSearchingPlace(false);
-    }, 450);
-  }
-
-  function pickPlace(p: PlaceResult) {
-    setPlaceSelected(p);
-    setPlaceQuery(p.name);
-    setPlaceResults([]);
+    if (error) return { error: error.message };
   }
 
   async function enableNearby() {
@@ -257,72 +209,6 @@ export default function HomeScreen() {
       setUserCoords(coords);
     }
     setSortMode('nearby');
-  }
-
-  function resetForm() {
-    setTitle('');
-    setDescription('');
-    setPickedDate(null);
-    setPickedTime(null);
-    setPlaceQuery('');
-    setPlaceResults([]);
-    setPlaceSelected(null);
-    setHost('');
-    setAddingClub(false);
-    setNewClubName('');
-    setNewClubEmoji('');
-    setFormError('');
-  }
-
-  async function createEvent() {
-    setFormError('');
-    if (!title.trim()) {
-      setFormError('Give your event a title.');
-      return;
-    }
-    if (!pickedDate) {
-      setFormError('Pick a date.');
-      return;
-    }
-    if (!placeSelected) {
-      setFormError('Pick a location from the search results.');
-      return;
-    }
-
-    setSaving(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setFormError('You need to be signed in.');
-      setSaving(false);
-      return;
-    }
-
-    const y = pickedDate.getFullYear();
-    const m = String(pickedDate.getMonth() + 1).padStart(2, '0');
-    const d = String(pickedDate.getDate()).padStart(2, '0');
-    const hh = pickedTime ? String(pickedTime.getHours()).padStart(2, '0') : '00';
-    const mm = pickedTime ? String(pickedTime.getMinutes()).padStart(2, '0') : '00';
-    const eventTimeIso = `${y}-${m}-${d}T${hh}:${mm}:00`;
-
-    const { error } = await supabase.from('events').insert({
-      title: title.trim(),
-      description: description.trim() || null,
-      location: placeSelected.name,
-      event_time: eventTimeIso,
-      created_by: user.id,
-      host: host.trim() || null,
-      latitude: placeSelected.lat,
-      longitude: placeSelected.lng,
-    });
-
-    setSaving(false);
-    if (error) {
-      setFormError(error.message);
-      return;
-    }
-    setCreateVisible(false);
-    resetForm();
-    fetchAll();
   }
 
   // Filter + sort for display
@@ -351,21 +237,11 @@ export default function HomeScreen() {
       return b.created_at.localeCompare(a.created_at);
     });
 
-  const dynamicStyles = StyleSheet.create({
+  const dynamicStyles = useMemo(() => StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: colors.background },
     headerText: {
       color: colors.text, fontFamily: 'Helvetica', fontWeight: '900',
       fontSize: 32, letterSpacing: -1,
-    },
-    searchContainerShadow: {
-      backgroundColor: colors.border, borderRadius: 16,
-      marginTop: Spacing.two, marginBottom: Spacing.three,
-    },
-    searchContainer: {
-      flexDirection: 'row', backgroundColor: colors.backgroundElement,
-      borderWidth: 3, borderColor: colors.border, borderRadius: 16,
-      padding: Spacing.one, alignItems: 'center',
-      transform: [{ translateX: -4 }, { translateY: -4 }],
     },
     input: {
       flex: 1, paddingHorizontal: Spacing.two, fontSize: 15,
@@ -375,56 +251,11 @@ export default function HomeScreen() {
       backgroundColor: colors.accentCyan, padding: Spacing.two,
       borderRadius: 10, borderWidth: 2, borderColor: colors.border,
     },
-    createBtnShadow: { backgroundColor: colors.border, borderRadius: 14, marginBottom: Spacing.three },
-    createBtn: {
-      backgroundColor: colors.accentGreen, borderWidth: 2, borderColor: colors.border,
-      borderRadius: 14, paddingVertical: Spacing.two, alignItems: 'center',
-      transform: [{ translateX: -3 }, { translateY: -3 }],
-    },
-    sortChip: {
-      paddingVertical: Spacing.one, paddingHorizontal: Spacing.three, borderRadius: 999,
-      borderWidth: 2, borderColor: colors.border, backgroundColor: colors.backgroundElement,
-    },
-    sortChipActive: { backgroundColor: colors.accentPink },
-    cardShadow: { backgroundColor: colors.border, borderRadius: 20, marginBottom: Spacing.four },
-    card: {
-      backgroundColor: colors.backgroundElement, borderWidth: 3, borderColor: colors.border,
-      borderRadius: 20, padding: Spacing.three,
-      transform: [{ translateX: -6 }, { translateY: -6 }],
-    },
     actionBtn: {
       flex: 1, borderWidth: 2, borderColor: colors.border, borderRadius: 12,
       paddingVertical: Spacing.two, alignItems: 'center',
     },
-    modalSafe: { flex: 1, backgroundColor: colors.background },
-    label: {
-      fontSize: 12, fontWeight: '900', color: colors.accentCyan,
-      marginBottom: Spacing.two, marginTop: Spacing.three, letterSpacing: 0.5,
-    },
-    formInput: {
-      backgroundColor: colors.backgroundElement, color: colors.text, padding: Spacing.three,
-      borderRadius: 12, borderWidth: 2, borderColor: colors.border, fontSize: 15,
-    },
-    placeList: {
-      borderWidth: 2, borderColor: colors.border, borderRadius: 12,
-      marginTop: Spacing.two, backgroundColor: colors.backgroundElement, overflow: 'hidden',
-    },
-    hostChip: {
-      paddingVertical: Spacing.one, paddingHorizontal: Spacing.three, borderRadius: 999,
-      borderWidth: 2, borderColor: colors.border, backgroundColor: colors.backgroundElement,
-    },
-    hostChipSelected: { backgroundColor: colors.accentPink },
-    addClubBtn: {
-      backgroundColor: colors.accentCyan, borderWidth: 2, borderColor: colors.border,
-      borderRadius: 12, paddingHorizontal: Spacing.three, justifyContent: 'center', alignItems: 'center',
-    },
-    primaryBtnShadow: { backgroundColor: colors.border, borderRadius: 14, marginTop: Spacing.four },
-    primaryBtn: {
-      backgroundColor: colors.accentYellow, borderWidth: 2, borderColor: colors.border,
-      borderRadius: 14, paddingVertical: Spacing.three, alignItems: 'center',
-      transform: [{ translateX: -3 }, { translateY: -3 }],
-    },
-  });
+  }), [colors]);
 
   const sortOptions: { key: SortMode; label: string }[] = [
     { key: 'recent', label: '🆕 Recent' },
@@ -437,41 +268,47 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <ThemedText style={dynamicStyles.headerText}>LetsLiinger</ThemedText>
-          <TouchableOpacity style={[styles.ringBtn, { borderColor: colors.border }]}>
-            <ThemedText style={styles.emojiText}>🔔</ThemedText>
-          </TouchableOpacity>
+          <IconButton emoji="🔔" size={20} />
         </View>
 
-        <View style={dynamicStyles.searchContainerShadow}>
-          <View style={dynamicStyles.searchContainer}>
-            <TextInput
-              style={dynamicStyles.input}
-              placeholder="Search flyers, clubs, events..."
-              placeholderTextColor={colors.textSecondary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            <TouchableOpacity style={dynamicStyles.searchBtn}>
-              <ThemedText style={styles.boldText}>GO!</ThemedText>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={dynamicStyles.createBtnShadow}>
-          <TouchableOpacity style={dynamicStyles.createBtn} onPress={openCreate}>
-            <ThemedText style={styles.boldText}>+ CREATE EVENT</ThemedText>
+        <ShadowSurface
+          backgroundColor={colors.backgroundElement}
+          radius={16}
+          offset={4}
+          wrapperStyle={styles.searchShadow}
+          style={styles.searchContainer}
+        >
+          <TextInput
+            style={dynamicStyles.input}
+            placeholder="Search flyers, clubs, events..."
+            placeholderTextColor={colors.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          <TouchableOpacity style={dynamicStyles.searchBtn}>
+            <ThemedText style={styles.boldText}>GO!</ThemedText>
           </TouchableOpacity>
-        </View>
+        </ShadowSurface>
+
+        <ShadowSurface
+          backgroundColor={colors.accentGreen}
+          radius={14}
+          offset={3}
+          wrapperStyle={styles.createShadow}
+          style={styles.createBtn}
+          onPress={() => setCreateVisible(true)}
+        >
+          <ThemedText style={styles.boldText}>+ CREATE EVENT</ThemedText>
+        </ShadowSurface>
 
         <View style={styles.sortRow}>
           {sortOptions.map((opt) => (
-            <TouchableOpacity
+            <Chip
               key={opt.key}
-              style={[dynamicStyles.sortChip, sortMode === opt.key && dynamicStyles.sortChipActive]}
+              label={opt.label}
+              selected={sortMode === opt.key}
               onPress={() => (opt.key === 'nearby' ? enableNearby() : setSortMode(opt.key))}
-            >
-              <ThemedText style={styles.sortChipText}>{opt.label}</ThemedText>
-            </TouchableOpacity>
+            />
           ))}
         </View>
 
@@ -491,223 +328,97 @@ export default function HomeScreen() {
           </ThemedText>
         ) : (
           visibleEvents.map((event) => (
-            <View key={event.id} style={dynamicStyles.cardShadow}>
-              <TouchableOpacity
-                style={dynamicStyles.card}
-                activeOpacity={0.9}
-                onPress={() => router.push(`/event-detail?id=${event.id}`)}
-              >
-                <ThemedText style={styles.eventTitle}>{event.title}</ThemedText>
+            <ShadowSurface
+              key={event.id}
+              backgroundColor={colors.backgroundElement}
+              radius={20}
+              offset={6}
+              wrapperStyle={styles.cardShadow}
+              style={styles.card}
+              onPress={() => router.push(`/event-detail?id=${event.id}`)}
+            >
+              <ThemedText style={styles.eventTitle}>{event.title}</ThemedText>
 
-                <View style={styles.metaRow}>
-                  <ThemedText style={styles.metaLabel}>HOSTED BY:</ThemedText>
-                  <ThemedText style={styles.metaValue}>{event.hostName}</ThemedText>
-                </View>
+              <View style={styles.metaRow}>
+                <ThemedText style={styles.metaLabel}>HOSTED BY:</ThemedText>
+                <ThemedText style={styles.metaValue}>{event.hostName}</ThemedText>
+              </View>
 
+              <View style={styles.detailItem}>
+                <ThemedText style={styles.detailEmoji}>📍</ThemedText>
+                <ThemedText style={styles.detailText}>{event.location ?? 'TBD'}</ThemedText>
+              </View>
+
+              <View style={styles.detailItem}>
+                <ThemedText style={styles.detailEmoji}>🗓️</ThemedText>
+                <ThemedText style={styles.detailText}>
+                  {formatEventTime(event.event_time)}
+                </ThemedText>
+              </View>
+
+              {sortMode === 'nearby' && event.distance != null && (
                 <View style={styles.detailItem}>
-                  <ThemedText style={styles.detailEmoji}>📍</ThemedText>
-                  <ThemedText style={styles.detailText}>{event.location ?? 'TBD'}</ThemedText>
-                </View>
-
-                <View style={styles.detailItem}>
-                  <ThemedText style={styles.detailEmoji}>🗓️</ThemedText>
+                  <ThemedText style={styles.detailEmoji}>🧭</ThemedText>
                   <ThemedText style={styles.detailText}>
-                    {formatEventTime(event.event_time)}
+                    {event.distance < 1
+                      ? `${Math.round(event.distance * 1000)} m away`
+                      : `${event.distance.toFixed(1)} km away`}
                   </ThemedText>
                 </View>
+              )}
 
-                {sortMode === 'nearby' && event.distance != null && (
-                  <View style={styles.detailItem}>
-                    <ThemedText style={styles.detailEmoji}>🧭</ThemedText>
-                    <ThemedText style={styles.detailText}>
-                      {event.distance < 1
-                        ? `${Math.round(event.distance * 1000)} m away`
-                        : `${event.distance.toFixed(1)} km away`}
-                    </ThemedText>
-                  </View>
-                )}
+              {event.rsvpCount > 0 && (
+                <ThemedText style={styles.rsvpLine} themeColor="textSecondary">
+                  🎟️ {rsvpSummary(event.rsvpers, event.rsvpCount)}
+                </ThemedText>
+              )}
 
-                {event.rsvpCount > 0 && (
-                  <ThemedText style={styles.rsvpLine} themeColor="textSecondary">
-                    🎟️ {rsvpSummary(event.rsvpers, event.rsvpCount)}
+              <View style={styles.cardActions}>
+                <TouchableOpacity
+                  style={[
+                    dynamicStyles.actionBtn,
+                    { backgroundColor: event.rsvpedByMe ? colors.accentGreen : colors.accentYellow },
+                  ]}
+                  onPress={() => toggleRsvp(event)}
+                >
+                  <ThemedText style={styles.buttonText}>
+                    {event.rsvpedByMe ? "✓ RSVP'D!" : 'RSVP'}
                   </ThemedText>
-                )}
+                </TouchableOpacity>
 
-                <View style={styles.cardActions}>
-                  <TouchableOpacity
-                    style={[
-                      dynamicStyles.actionBtn,
-                      { backgroundColor: event.rsvpedByMe ? colors.accentGreen : colors.accentYellow },
-                    ]}
-                    onPress={() => toggleRsvp(event)}
-                  >
-                    <ThemedText style={styles.buttonText}>
-                      {event.rsvpedByMe ? "✓ RSVP'D!" : 'RSVP'}
-                    </ThemedText>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      dynamicStyles.actionBtn,
-                      { backgroundColor: event.likedByMe ? colors.accentPink : colors.accentCyan, flex: 0.5 },
-                    ]}
-                    onPress={() => toggleLike(event)}
-                  >
-                    <ThemedText style={styles.buttonText}>
-                      {event.likedByMe ? '💖' : '🤍'} {event.likeCount}
-                    </ThemedText>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.cardFooter}>
-                  <ThemedText style={styles.postedText} themeColor="textSecondary">
-                    Posted {formatPosted(event.created_at)} by {event.postedBy}
+                <TouchableOpacity
+                  style={[
+                    dynamicStyles.actionBtn,
+                    { backgroundColor: event.likedByMe ? colors.accentPink : colors.accentCyan, flex: 0.5 },
+                  ]}
+                  onPress={() => toggleLike(event)}
+                >
+                  <ThemedText style={styles.buttonText}>
+                    {event.likedByMe ? '💖' : '🤍'} {event.likeCount}
                   </ThemedText>
-                  <ThemedText style={styles.commentHint} themeColor="textSecondary">
-                    Tap to view & comment →
-                  </ThemedText>
-                </View>
-              </TouchableOpacity>
-            </View>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.cardFooter}>
+                <ThemedText style={styles.postedText} themeColor="textSecondary">
+                  Posted {formatPosted(event.created_at)} by {event.postedBy}
+                </ThemedText>
+                <ThemedText style={styles.commentHint} themeColor="textSecondary">
+                  Tap to view & comment →
+                </ThemedText>
+              </View>
+            </ShadowSurface>
           ))
         )}
       </ScrollView>
 
-      {/* Create event modal */}
-      <Modal visible={createVisible} animationType="slide" onRequestClose={() => setCreateVisible(false)}>
-        <SafeAreaView style={dynamicStyles.modalSafe} edges={['top', 'left', 'right']}>
-          <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => { setCreateVisible(false); resetForm(); }}>
-                <ThemedText style={styles.modalCancel}>Cancel</ThemedText>
-              </TouchableOpacity>
-              <ThemedText style={styles.modalTitle}>New event</ThemedText>
-              <View style={{ width: 50 }} />
-            </View>
-
-            <ThemedText style={dynamicStyles.label}>Title</ThemedText>
-            <TextInput
-              style={dynamicStyles.formInput}
-              placeholder="House Party & Indie Jam"
-              placeholderTextColor={colors.textSecondary}
-              value={title}
-              onChangeText={setTitle}
-            />
-
-            <ThemedText style={dynamicStyles.label}>Description</ThemedText>
-            <TextInput
-              style={[dynamicStyles.formInput, styles.multiline]}
-              placeholder="What's the vibe?"
-              placeholderTextColor={colors.textSecondary}
-              multiline
-              value={description}
-              onChangeText={setDescription}
-            />
-
-            <ThemedText style={dynamicStyles.label}>Location</ThemedText>
-            <TextInput
-              style={dynamicStyles.formInput}
-              placeholder="Search a real place…"
-              placeholderTextColor={colors.textSecondary}
-              value={placeQuery}
-              onChangeText={onPlaceQueryChange}
-              autoCapitalize="none"
-            />
-            {searchingPlace && (
-              <ThemedText style={styles.placeHint} themeColor="textSecondary">Searching…</ThemedText>
-            )}
-            {placeSelected && (
-              <ThemedText style={styles.placeHint} themeColor="textSecondary">
-                ✓ Pinned: {placeSelected.name}
-              </ThemedText>
-            )}
-            {placeResults.length > 0 && (
-              <View style={dynamicStyles.placeList}>
-                {placeResults.map((p, i) => (
-                  <TouchableOpacity
-                    key={`${p.lat}-${p.lng}-${i}`}
-                    style={[styles.placeRow, i < placeResults.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
-                    onPress={() => pickPlace(p)}
-                  >
-                    <ThemedText style={styles.placeRowText}>📍 {p.name}</ThemedText>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            <ThemedText style={dynamicStyles.label}>Hosting club (optional)</ThemedText>
-            <View style={styles.hostChipWrap}>
-              {clubs.map((c) => {
-                const label = clubLabel(c);
-                const selected = host === label;
-                return (
-                  <TouchableOpacity
-                    key={c.id}
-                    style={[dynamicStyles.hostChip, selected && dynamicStyles.hostChipSelected]}
-                    onPress={() => setHost(selected ? '' : label)}
-                  >
-                    <ThemedText style={styles.hostChipText}>{label}</ThemedText>
-                  </TouchableOpacity>
-                );
-              })}
-              <TouchableOpacity
-                style={[dynamicStyles.hostChip, styles.addClubChip]}
-                onPress={() => setAddingClub((v) => !v)}
-              >
-                <ThemedText style={styles.hostChipText}>➕ Add club</ThemedText>
-              </TouchableOpacity>
-            </View>
-            {addingClub && (
-              <View style={styles.addClubRow}>
-                <TextInput
-                  style={[dynamicStyles.formInput, styles.emojiInput]}
-                  placeholder="🎸"
-                  placeholderTextColor={colors.textSecondary}
-                  value={newClubEmoji}
-                  onChangeText={setNewClubEmoji}
-                  maxLength={2}
-                />
-                <TextInput
-                  style={[dynamicStyles.formInput, styles.clubNameInput]}
-                  placeholder="New club name"
-                  placeholderTextColor={colors.textSecondary}
-                  value={newClubName}
-                  onChangeText={setNewClubName}
-                />
-                <TouchableOpacity style={dynamicStyles.addClubBtn} onPress={handleAddClub}>
-                  <ThemedText style={styles.buttonText}>Add</ThemedText>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            <ThemedText style={dynamicStyles.label}>Date</ThemedText>
-            <DateTimeField
-              mode="date"
-              value={pickedDate}
-              onChange={setPickedDate}
-              placeholder="Pick a date"
-              colors={colors}
-            />
-
-            <ThemedText style={dynamicStyles.label}>Time (optional)</ThemedText>
-            <DateTimeField
-              mode="time"
-              value={pickedTime}
-              onChange={setPickedTime}
-              placeholder="Pick a time"
-              colors={colors}
-            />
-
-            {formError ? <ThemedText style={styles.error}>{formError}</ThemedText> : null}
-
-            <View style={dynamicStyles.primaryBtnShadow}>
-              <TouchableOpacity style={dynamicStyles.primaryBtn} onPress={createEvent} disabled={saving}>
-                <ThemedText style={styles.buttonText}>{saving ? 'Posting...' : 'Post event'}</ThemedText>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
+      <EventFormModal
+        visible={createVisible}
+        mode="create"
+        onClose={() => setCreateVisible(false)}
+        onSubmit={handleCreateSubmit}
+        onSuccess={fetchAll}
+      />
     </SafeAreaView>
   );
 }
@@ -737,12 +448,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', marginBottom: Spacing.two,
   },
-  ringBtn: { padding: Spacing.two, borderRadius: 50, borderWidth: 2 },
-  emojiText: { fontSize: 20 },
   boldText: { fontWeight: '900', color: '#000', fontSize: 14 },
+  searchShadow: { marginTop: Spacing.two, marginBottom: Spacing.three },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', padding: Spacing.one },
+  createShadow: { marginBottom: Spacing.three },
+  createBtn: { paddingVertical: Spacing.two, alignItems: 'center' },
   sortRow: { flexDirection: 'row', gap: Spacing.two, marginBottom: Spacing.three },
-  sortChipText: { fontWeight: '900', fontSize: 12 },
   noteText: { fontSize: 13, fontWeight: '600', marginBottom: Spacing.three },
+  cardShadow: { marginBottom: Spacing.four },
+  card: { padding: Spacing.three },
   eventTitle: { fontSize: 22, fontWeight: '900', lineHeight: 26, marginBottom: Spacing.one },
   metaRow: {
     flexDirection: 'row', alignItems: 'center',
@@ -765,23 +479,4 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two, gap: Spacing.two, flexWrap: 'wrap',
   },
   postedText: { fontSize: 11, fontWeight: '700' },
-  // Modal
-  modalContent: { padding: Spacing.four, paddingBottom: 80 },
-  modalHeader: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: Spacing.two,
-  },
-  modalCancel: { fontSize: 15, fontWeight: '700', width: 50 },
-  modalTitle: { fontSize: 18, fontWeight: '900' },
-  multiline: { height: 80, textAlignVertical: 'top' },
-  placeHint: { fontSize: 12, fontWeight: '700', marginTop: Spacing.one },
-  placeRow: { paddingVertical: Spacing.two, paddingHorizontal: Spacing.three },
-  placeRowText: { fontSize: 14, fontWeight: '700' },
-  hostChipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, marginBottom: Spacing.two },
-  hostChipText: { fontWeight: '900', fontSize: 12 },
-  addClubChip: { borderStyle: 'dashed' },
-  addClubRow: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.one },
-  emojiInput: { width: 56, textAlign: 'center' },
-  clubNameInput: { flex: 1 },
-  error: { color: '#ff6b6b', marginTop: Spacing.three, textAlign: 'center' },
 });
