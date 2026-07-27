@@ -5,6 +5,7 @@ export default function TabLayout() {
     <Tabs screenOptions={{ headerShown: false }}>
       <Tabs.Screen name="edit-profile" options={{ href: null }} />
       <Tabs.Screen name="event-detail" options={{ href: null }} />
+      <Tabs.Screen name="dm-thread" options={{ href: null }} />
     </Tabs>
   );
 }

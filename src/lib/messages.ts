@@ -1,0 +1,127 @@
+import { supabase } from '../supabaseClient';
+
+export interface ProfileLite {
+  id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+}
+
+export interface DirectMessage {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  content: string;
+  created_at: string;
+}
+
+export interface ConversationSummary {
+  otherUserId: string;
+  otherProfile: ProfileLite | null;
+  lastContent: string;
+  lastCreatedAt: string;
+  lastMessageMine: boolean;
+}
+
+// One row per conversation, newest first. Backed by the get_conversations()
+// Postgres function so the inbox never has to download full message history
+// just to show a handful of previews.
+export async function fetchConversations(myUserId: string): Promise<ConversationSummary[]> {
+  const { data: rows } = await supabase.rpc('get_conversations');
+  const list = rows ?? [];
+  if (list.length === 0) return [];
+
+  const otherIds = list.map((r: any) => r.other_user_id);
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, username, display_name, avatar_url')
+    .in('id', otherIds);
+
+  const profileById = new Map((profiles ?? []).map((p: any) => [p.id, p as ProfileLite]));
+
+  return list
+    .map((r: any) => ({
+      otherUserId: r.other_user_id,
+      otherProfile: profileById.get(r.other_user_id) ?? null,
+      lastContent: r.last_content,
+      lastCreatedAt: r.last_created_at,
+      lastMessageMine: r.last_sender_id === myUserId,
+    }))
+    .sort((a: ConversationSummary, b: ConversationSummary) => b.lastCreatedAt.localeCompare(a.lastCreatedAt));
+}
+
+// The most recent `limit` messages between exactly two users, oldest first.
+// Capped rather than full history — see dm-thread.tsx for the FlatList
+// rendering that this pairs with.
+export async function fetchThread(myUserId: string, otherUserId: string, limit = 50): Promise<DirectMessage[]> {
+  const { data } = await supabase
+    .from('direct_messages')
+    .select('id, sender_id, recipient_id, content, created_at')
+    .or(`and(sender_id.eq.${myUserId},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${myUserId})`)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  return (data ?? []).slice().reverse();
+}
+
+export async function sendDirectMessage(
+  senderId: string,
+  recipientId: string,
+  content: string
+): Promise<{ error?: string }> {
+  const { error } = await supabase
+    .from('direct_messages')
+    .insert({ sender_id: senderId, recipient_id: recipientId, content });
+  if (error) return { error: error.message };
+  return {};
+}
+
+export async function fetchProfile(userId: string): Promise<ProfileLite | null> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, username, display_name, avatar_url')
+    .eq('id', userId)
+    .single();
+  return (data as ProfileLite) ?? null;
+}
+
+export async function searchProfilesByUsername(query: string, excludeUserId: string): Promise<ProfileLite[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, username, display_name, avatar_url')
+    .ilike('username', `%${trimmed}%`)
+    .neq('id', excludeUserId)
+    .limit(20);
+  return (data as ProfileLite[]) ?? [];
+}
+
+// Registers two INSERT listeners on one realtime channel — Postgres-changes
+// filters only support a single `column=eq.value` condition, so "sender OR
+// recipient is me" needs two separate registrations rather than one filter.
+// Returns an unsubscribe function.
+export function subscribeToMyMessages(myUserId: string, onInsert: (row: DirectMessage) => void): () => void {
+  const channel = supabase
+    .channel(`dm-${myUserId}-${Math.random().toString(36).slice(2)}`)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'direct_messages', filter: `recipient_id=eq.${myUserId}` },
+      (payload) => onInsert(payload.new as DirectMessage)
+    )
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'direct_messages', filter: `sender_id=eq.${myUserId}` },
+      (payload) => onInsert(payload.new as DirectMessage)
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+export function profileLabel(p: ProfileLite | null | undefined): string {
+  if (!p) return 'Someone';
+  return p.username ? `@${p.username}` : p.display_name ?? 'Someone';
+}

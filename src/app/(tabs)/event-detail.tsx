@@ -19,6 +19,12 @@ interface Comment {
   content: string;
   created_at: string;
   author: string;
+  authorId: string;
+}
+
+interface Attendee {
+  userId: string;
+  label: string;
 }
 
 interface EventDetail {
@@ -46,7 +52,7 @@ export default function EventDetailScreen() {
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [likeCount, setLikeCount] = useState(0);
   const [likedByMe, setLikedByMe] = useState(false);
-  const [rsvpers, setRsvpers] = useState<string[]>([]);
+  const [rsvpers, setRsvpers] = useState<Attendee[]>([]);
   const [rsvpedByMe, setRsvpedByMe] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -79,7 +85,7 @@ export default function EventDetailScreen() {
         .eq('event_id', id),
       supabase
         .from('event_comments')
-        .select('id, content, created_at, author:profiles!event_comments_user_id_fkey(username, display_name)')
+        .select('id, content, created_at, user_id, author:profiles!event_comments_user_id_fkey(username, display_name)')
         .eq('event_id', id)
         .order('created_at', { ascending: true }),
     ]);
@@ -110,7 +116,12 @@ export default function EventDetailScreen() {
 
     const rsvps = rsvpsRes.data ?? [];
     setRsvpers(
-      rsvps.map((r: any) => (r.profile?.username ? `@${r.profile.username}` : r.profile?.display_name)).filter(Boolean)
+      rsvps
+        .map((r: any) => ({
+          userId: r.user_id,
+          label: r.profile?.username ? `@${r.profile.username}` : r.profile?.display_name,
+        }))
+        .filter((r) => !!r.label)
     );
     setRsvpedByMe(!!user && rsvps.some((r) => r.user_id === user.id));
 
@@ -119,6 +130,7 @@ export default function EventDetailScreen() {
         id: c.id,
         content: c.content,
         created_at: c.created_at,
+        authorId: c.user_id,
         author: c.author?.username ? `@${c.author.username}` : c.author?.display_name ?? 'Someone',
       }))
     );
@@ -293,7 +305,13 @@ export default function EventDetailScreen() {
           <ThemedText style={styles.title}>{event.title}</ThemedText>
           <View style={styles.metaRow}>
             <ThemedText style={styles.metaLabel}>HOSTED BY:</ThemedText>
-            <ThemedText style={styles.metaValue}>{event.hostName}</ThemedText>
+            {event.createdBy && event.createdBy !== userId ? (
+              <TouchableOpacity onPress={() => router.push(`/dm-thread?userId=${event.createdBy}`)}>
+                <ThemedText style={styles.metaValue}>{event.hostName}</ThemedText>
+              </TouchableOpacity>
+            ) : (
+              <ThemedText style={styles.metaValue}>{event.hostName}</ThemedText>
+            )}
           </View>
 
           {!!event.description && (
@@ -334,16 +352,24 @@ export default function EventDetailScreen() {
           <ThemedText style={styles.noteText} themeColor="textSecondary">No RSVPs yet — be the first!</ThemedText>
         ) : (
           <View style={styles.rsvpWrap}>
-            {rsvpers.map((r, i) => (
-              <Badge
-                key={`${r}-${i}`}
-                label={r}
-                backgroundColor={colors.accentGreen}
-                radius={999}
-                style={styles.rsvpBadge}
-                textStyle={styles.rsvpBadgeText}
-              />
-            ))}
+            {rsvpers.map((r) => {
+              const badge = (
+                <Badge
+                  label={r.label}
+                  backgroundColor={colors.accentGreen}
+                  radius={999}
+                  style={styles.rsvpBadge}
+                  textStyle={styles.rsvpBadgeText}
+                />
+              );
+              return r.userId === userId ? (
+                <View key={r.userId}>{badge}</View>
+              ) : (
+                <TouchableOpacity key={r.userId} onPress={() => router.push(`/dm-thread?userId=${r.userId}`)}>
+                  {badge}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
 
@@ -368,7 +394,13 @@ export default function EventDetailScreen() {
         ) : (
           comments.map((c) => (
             <View key={c.id} style={dynamicStyles.commentCard}>
-              <ThemedText style={styles.commentAuthor}>{c.author}</ThemedText>
+              {c.authorId === userId ? (
+                <ThemedText style={styles.commentAuthor}>{c.author}</ThemedText>
+              ) : (
+                <TouchableOpacity onPress={() => router.push(`/dm-thread?userId=${c.authorId}`)}>
+                  <ThemedText style={styles.commentAuthor}>{c.author}</ThemedText>
+                </TouchableOpacity>
+              )}
               <ThemedText style={styles.commentText}>{c.content}</ThemedText>
               <ThemedText style={styles.commentTime} themeColor="textSecondary">{formatEventTime(c.created_at)}</ThemedText>
             </View>
