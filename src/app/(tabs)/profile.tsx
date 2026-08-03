@@ -208,6 +208,17 @@ export default function ProfileScreen() {
           </ShadowSurface>
         </View>
 
+        <ShadowSurface
+          backgroundColor={colors.accentYellow}
+          radius={14}
+          offset={4}
+          wrapperStyle={styles.insightsBtnShadow}
+          style={styles.insightsBtn}
+          onPress={() => router.push('/insights')}
+        >
+          <ThemedText style={styles.insightsBtnText}>📊 MY EVENT INSIGHTS</ThemedText>
+        </ShadowSurface>
+
         <View style={styles.sectionHeader}>
           <ThemedText style={styles.sectionTitle}>🏷️ MY CLUBS</ThemedText>
         </View>
@@ -333,6 +344,9 @@ const styles = StyleSheet.create({
   },
   statBoxShadow: { flex: 1 },
   statBox: { paddingVertical: Spacing.two, alignItems: 'center' },
+  insightsBtnShadow: { marginBottom: Spacing.four },
+  insightsBtn: { paddingVertical: Spacing.three, alignItems: 'center' },
+  insightsBtnText: { fontWeight: '900', color: '#000', fontSize: 14, letterSpacing: 0.5 },
   statNumber: {
     fontSize: 20,
     fontWeight: '900',
