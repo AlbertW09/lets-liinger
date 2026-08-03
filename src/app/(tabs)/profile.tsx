@@ -18,6 +18,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { getFollowCounts } from '../../lib/follows';
 import { supabase } from '../../supabaseClient';
 
 export default function ProfileScreen() {
@@ -40,6 +41,8 @@ export default function ProfileScreen() {
     location: string;
   }[]>([]);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [selfId, setSelfId] = useState<string | null>(null);
+  const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
 
   async function handleLogOut() {
     setMenuVisible(false);
@@ -57,6 +60,8 @@ export default function ProfileScreen() {
           if (!cancelled) setLoadingProfile(false);
           return;
         }
+        setSelfId(user.id);
+        getFollowCounts(user.id).then((c) => { if (!cancelled) setFollowCounts(c); });
 
         const [profileRes, rsvpRes] = await Promise.all([
           supabase
@@ -139,7 +144,10 @@ export default function ProfileScreen() {
 
         <View style={styles.header}>
           <ThemedText style={dynamicStyles.headerText}>my profile</ThemedText>
-          <IconButton emoji="⚙️" onPress={() => setMenuVisible(true)} />
+          <View style={styles.headerActions}>
+            <IconButton emoji="🔎" onPress={() => router.push('/search')} />
+            <IconButton emoji="⚙️" onPress={() => setMenuVisible(true)} />
+          </View>
         </View>
 
         <Modal
@@ -195,6 +203,26 @@ export default function ProfileScreen() {
             <ThemedText style={styles.boldBtnText}>EDIT PROFILE</ThemedText>
           </ShadowSurface>
         </ShadowSurface>
+
+        <View style={styles.statsRow}>
+          <ShadowSurface
+            backgroundColor={colors.backgroundElement} radius={16} offset={4}
+            wrapperStyle={styles.statBoxShadow} style={styles.statBox}
+            onPress={() => selfId && router.push(`/connections?userId=${selfId}&type=followers`)}
+          >
+            <ThemedText style={styles.statNumber}>{followCounts.followers}</ThemedText>
+            <ThemedText style={styles.statLabel}>FOLLOWERS</ThemedText>
+          </ShadowSurface>
+
+          <ShadowSurface
+            backgroundColor={colors.backgroundElement} radius={16} offset={4}
+            wrapperStyle={styles.statBoxShadow} style={styles.statBox}
+            onPress={() => selfId && router.push(`/connections?userId=${selfId}&type=following`)}
+          >
+            <ThemedText style={styles.statNumber}>{followCounts.following}</ThemedText>
+            <ThemedText style={styles.statLabel}>FOLLOWING</ThemedText>
+          </ShadowSurface>
+        </View>
 
         <View style={styles.statsRow}>
           <ShadowSurface backgroundColor={colors.backgroundElement} radius={16} offset={4} wrapperStyle={styles.statBoxShadow} style={styles.statBox}>
@@ -293,6 +321,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.three,
   },
+  headerActions: { flexDirection: 'row', gap: Spacing.two },
   avatarImage: {
     width: '100%',
     height: '100%',
