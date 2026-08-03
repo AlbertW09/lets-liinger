@@ -8,7 +8,8 @@ import { ThemedText } from '@/components/themed-text';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { followUser, getFollowingIds, PublicProfile, searchProfiles, unfollowUser } from '../../lib/follows';
+import { followUser, getFollowingIds, getSuggestions, PublicProfile, searchProfiles, unfollowUser } from '../../lib/follows';
+import { getBlockedIds } from '../../lib/moderation';
 import { supabase } from '../../supabaseClient';
 
 export default function SearchScreen() {
@@ -19,6 +20,8 @@ export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<PublicProfile[]>([]);
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
+  const [suggestions, setSuggestions] = useState<PublicProfile[]>([]);
   const [searching, setSearching] = useState(false);
   const [touched, setTouched] = useState(false);
   const timer = useRef<any>(null);
@@ -28,9 +31,19 @@ export default function SearchScreen() {
       let cancelled = false;
       (async () => {
         const { data: { user } } = await supabase.auth.getUser();
+        if (cancelled || !user) return;
+        setSelfId(user.id);
+        const [prof, following, blocked] = await Promise.all([
+          supabase.from('profiles').select('interests').eq('id', user.id).single(),
+          getFollowingIds(user.id),
+          getBlockedIds(user.id),
+        ]);
         if (cancelled) return;
-        setSelfId(user?.id ?? null);
-        if (user) setFollowingIds(await getFollowingIds(user.id));
+        setFollowingIds(following);
+        setBlockedIds(blocked);
+        const exclude = new Set<string>([...following, ...blocked]);
+        const sugg = await getSuggestions(user.id, (prof.data as any)?.interests ?? [], exclude);
+        if (!cancelled) setSuggestions(sugg);
       })();
       return () => { cancelled = true; };
     }, [])
@@ -48,7 +61,7 @@ export default function SearchScreen() {
     setSearching(true);
     timer.current = setTimeout(async () => {
       const found = await searchProfiles(text, selfId);
-      setResults(found);
+      setResults(found.filter((p) => !blockedIds.has(p.id)));
       setSearching(false);
     }, 350);
   }
@@ -97,6 +110,19 @@ export default function SearchScreen() {
             ))
           ) : touched && query.trim() ? (
             <ThemedText style={styles.note} themeColor="textSecondary">No one found for “{query.trim()}”.</ThemedText>
+          ) : suggestions.length > 0 ? (
+            <>
+              <ThemedText style={styles.suggestTitle}>✨ PEOPLE YOU MAY KNOW</ThemedText>
+              <ThemedText style={styles.suggestSub} themeColor="textSecondary">Based on interests you share.</ThemedText>
+              {suggestions.map((p) => (
+                <PersonRow
+                  key={p.id}
+                  profile={p}
+                  isFollowing={followingIds.has(p.id)}
+                  onToggleFollow={() => toggleFollow(p.id)}
+                />
+              ))}
+            </>
           ) : (
             <ThemedText style={styles.note} themeColor="textSecondary">
               Search classmates by name or @username to follow them.
@@ -116,4 +142,6 @@ const styles = StyleSheet.create({
   title: { fontFamily: 'ui-rounded', fontWeight: '900', fontSize: 26, letterSpacing: -1, marginBottom: Spacing.two },
   results: { marginTop: Spacing.three },
   note: { fontSize: 13, fontWeight: '600', marginTop: Spacing.three, textAlign: 'center' },
+  suggestTitle: { fontSize: 15, fontWeight: '900', letterSpacing: 0.5, marginBottom: 2 },
+  suggestSub: { fontSize: 12, fontWeight: '600', marginBottom: Spacing.three },
 });

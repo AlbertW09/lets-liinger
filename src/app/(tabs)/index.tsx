@@ -17,6 +17,8 @@ import { IconButton } from '@/components/ui/icon-button';
 import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { getFollowingIds, getUnreadFollowerCount } from '../../lib/follows';
+import { getBlockedIds } from '../../lib/moderation';
 import { supabase } from '../../supabaseClient';
 
 type SortMode = 'popular' | 'recent' | 'nearby';
@@ -37,6 +39,7 @@ interface EnrichedEvent {
   created_at: string;
   hostName: string;
   postedBy: string;
+  createdBy: string | null;
   likeCount: number;
   likedByMe: boolean;
   rsvpCount: number;
@@ -99,23 +102,33 @@ export default function HomeScreen() {
   const [userCoords, setUserCoords] = useState<Coords | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('recent');
+  const [followingOnly, setFollowingOnly] = useState(false);
+  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [createVisible, setCreateVisible] = useState(false);
 
   const fetchAll = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUserId(user?.id ?? null);
 
-    const [eventsRes, likesRes, rsvpsRes] = await Promise.all([
+    const [eventsRes, likesRes, rsvpsRes, following, blocked, unread] = await Promise.all([
       supabase
         .from('events')
-        .select('id, title, description, location, event_time, latitude, longitude, created_at, host, creator:profiles!events_created_by_fkey(username, display_name)'),
+        .select('id, title, description, location, event_time, latitude, longitude, created_at, host, created_by, creator:profiles!events_created_by_fkey(username, display_name)'),
       supabase.from('event_likes').select('event_id, user_id'),
       supabase
         .from('rsvps')
         .select('event_id, user_id, profile:profiles!rsvps_user_id_fkey(username, display_name)'),
+      user ? getFollowingIds(user.id) : Promise.resolve(new Set<string>()),
+      user ? getBlockedIds(user.id) : Promise.resolve(new Set<string>()),
+      user ? getUnreadFollowerCount(user.id) : Promise.resolve(0),
     ]);
 
-    const rawEvents = eventsRes.data ?? [];
+    setFollowingIds(following);
+    setUnreadNotifs(unread);
+
+    // Hide events posted by people you've blocked (or who blocked you).
+    const rawEvents = (eventsRes.data ?? []).filter((e: any) => !e.created_by || !blocked.has(e.created_by));
     const likes = likesRes.data ?? [];
     const rsvps = rsvpsRes.data ?? [];
 
@@ -139,6 +152,7 @@ export default function HomeScreen() {
             ? `@${e.creator.username}`
             : e.creator?.display_name ?? 'Someone',
         postedBy: e.creator?.username ? `@${e.creator.username}` : e.creator?.display_name ?? 'someone',
+        createdBy: e.created_by ?? null,
         likeCount: eventLikes.length,
         likedByMe: !!user && eventLikes.some((l) => l.user_id === user.id),
         rsvpCount: eventRsvps.length,
@@ -213,6 +227,7 @@ export default function HomeScreen() {
 
   // Filter + sort for display
   const visibleEvents = events
+    .filter((e) => (followingOnly ? !!e.createdBy && followingIds.has(e.createdBy) : true))
     .filter((e) => {
       const q = searchQuery.trim().toLowerCase();
       if (!q) return true;
@@ -268,7 +283,14 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <ThemedText style={dynamicStyles.headerText}>LetsLiinger</ThemedText>
-          <IconButton emoji="🔔" size={20} />
+          <View>
+            <IconButton emoji="🔔" size={20} onPress={() => router.push('/notifications')} />
+            {unreadNotifs > 0 && (
+              <View style={[styles.badge, { backgroundColor: colors.accentPink, borderColor: colors.border }]}>
+                <ThemedText style={styles.badgeText}>{unreadNotifs > 9 ? '9+' : unreadNotifs}</ThemedText>
+              </View>
+            )}
+          </View>
         </View>
 
         <ShadowSurface
@@ -310,7 +332,19 @@ export default function HomeScreen() {
               onPress={() => (opt.key === 'nearby' ? enableNearby() : setSortMode(opt.key))}
             />
           ))}
+          <Chip
+            label="👥 Following"
+            selected={followingOnly}
+            selectedColor={colors.accentGreen}
+            onPress={() => setFollowingOnly((v) => !v)}
+          />
         </View>
+
+        {followingOnly && visibleEvents.length === 0 && !loading && (
+          <ThemedText style={styles.noteText} themeColor="textSecondary">
+            No events from people you follow yet. Follow classmates to fill this up!
+          </ThemedText>
+        )}
 
         {sortMode === 'nearby' && !userCoords && (
           <ThemedText style={styles.noteText} themeColor="textSecondary">
@@ -400,9 +434,17 @@ export default function HomeScreen() {
               </View>
 
               <View style={styles.cardFooter}>
-                <ThemedText style={styles.postedText} themeColor="textSecondary">
-                  Posted {formatPosted(event.created_at)} by {event.postedBy}
-                </ThemedText>
+                {event.createdBy && event.createdBy !== userId ? (
+                  <TouchableOpacity onPress={() => router.push(`/user?id=${event.createdBy}`)}>
+                    <ThemedText style={styles.postedText} themeColor="textSecondary">
+                      Posted {formatPosted(event.created_at)} by {event.postedBy}
+                    </ThemedText>
+                  </TouchableOpacity>
+                ) : (
+                  <ThemedText style={styles.postedText} themeColor="textSecondary">
+                    Posted {formatPosted(event.created_at)} by {event.postedBy}
+                  </ThemedText>
+                )}
                 <ThemedText style={styles.commentHint} themeColor="textSecondary">
                   Tap to view & comment →
                 </ThemedText>
@@ -474,6 +516,11 @@ const styles = StyleSheet.create({
   cardActions: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.two },
   buttonText: { fontWeight: '900', color: '#000', fontSize: 14 },
   commentHint: { fontSize: 11, fontWeight: '700' },
+  badge: {
+    position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9,
+    borderWidth: 2, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+  },
+  badgeText: { fontSize: 10, fontWeight: '900', color: '#000' },
   cardFooter: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     marginTop: Spacing.two, gap: Spacing.two, flexWrap: 'wrap',

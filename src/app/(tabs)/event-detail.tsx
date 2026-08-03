@@ -12,6 +12,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { getFollowingIds } from '../../lib/follows';
 import { supabase } from '../../supabaseClient';
 
 interface Comment {
@@ -54,6 +55,7 @@ export default function EventDetailScreen() {
   const [likedByMe, setLikedByMe] = useState(false);
   const [rsvpers, setRsvpers] = useState<Attendee[]>([]);
   const [rsvpedByMe, setRsvpedByMe] = useState(false);
+  const [friendsGoing, setFriendsGoing] = useState<string[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [posting, setPosting] = useState(false);
@@ -115,15 +117,22 @@ export default function EventDetailScreen() {
     setLikedByMe(!!user && likes.some((l) => l.user_id === user.id));
 
     const rsvps = rsvpsRes.data ?? [];
-    setRsvpers(
-      rsvps
-        .map((r: any) => ({
-          userId: r.user_id,
-          label: r.profile?.username ? `@${r.profile.username}` : r.profile?.display_name,
-        }))
-        .filter((r) => !!r.label)
-    );
+    const attendees: Attendee[] = rsvps
+      .map((r: any) => ({
+        userId: r.user_id,
+        label: r.profile?.username ? `@${r.profile.username}` : r.profile?.display_name,
+      }))
+      .filter((r) => !!r.label);
+    setRsvpers(attendees);
     setRsvpedByMe(!!user && rsvps.some((r) => r.user_id === user.id));
+
+    // Which of the people I follow are going (social proof).
+    if (user) {
+      const following = await getFollowingIds(user.id);
+      setFriendsGoing(attendees.filter((a) => following.has(a.userId)).map((a) => a.label));
+    } else {
+      setFriendsGoing([]);
+    }
 
     setComments(
       (commentsRes.data ?? []).map((c: any) => ({
@@ -306,7 +315,7 @@ export default function EventDetailScreen() {
           <View style={styles.metaRow}>
             <ThemedText style={styles.metaLabel}>HOSTED BY:</ThemedText>
             {event.createdBy && event.createdBy !== userId ? (
-              <TouchableOpacity onPress={() => router.push(`/dm-thread?userId=${event.createdBy}`)}>
+              <TouchableOpacity onPress={() => router.push(`/user?id=${event.createdBy}`)}>
                 <ThemedText style={styles.metaValue}>{event.hostName}</ThemedText>
               </TouchableOpacity>
             ) : (
@@ -327,9 +336,23 @@ export default function EventDetailScreen() {
             <ThemedText style={styles.detailText}>{formatEventTime(event.event_time)}</ThemedText>
           </View>
 
-          <ThemedText style={styles.postedText} themeColor="textSecondary">
-            📣 Posted {formatPosted(event.created_at)} by {event.postedBy}
-          </ThemedText>
+          {event.createdBy && event.createdBy !== userId ? (
+            <TouchableOpacity onPress={() => router.push(`/user?id=${event.createdBy}`)}>
+              <ThemedText style={styles.postedText} themeColor="textSecondary">
+                📣 Posted {formatPosted(event.created_at)} by {event.postedBy}
+              </ThemedText>
+            </TouchableOpacity>
+          ) : (
+            <ThemedText style={styles.postedText} themeColor="textSecondary">
+              📣 Posted {formatPosted(event.created_at)} by {event.postedBy}
+            </ThemedText>
+          )}
+
+          {friendsGoing.length > 0 && (
+            <ThemedText style={styles.friendsGoing}>
+              👋 {friendsSummary(friendsGoing)}
+            </ThemedText>
+          )}
 
           <View style={styles.actionsRow}>
             <TouchableOpacity
@@ -365,7 +388,7 @@ export default function EventDetailScreen() {
               return r.userId === userId ? (
                 <View key={r.userId}>{badge}</View>
               ) : (
-                <TouchableOpacity key={r.userId} onPress={() => router.push(`/dm-thread?userId=${r.userId}`)}>
+                <TouchableOpacity key={r.userId} onPress={() => router.push(`/user?id=${r.userId}`)}>
                   {badge}
                 </TouchableOpacity>
               );
@@ -397,7 +420,7 @@ export default function EventDetailScreen() {
               {c.authorId === userId ? (
                 <ThemedText style={styles.commentAuthor}>{c.author}</ThemedText>
               ) : (
-                <TouchableOpacity onPress={() => router.push(`/dm-thread?userId=${c.authorId}`)}>
+                <TouchableOpacity onPress={() => router.push(`/user?id=${c.authorId}`)}>
                   <ThemedText style={styles.commentAuthor}>{c.author}</ThemedText>
                 </TouchableOpacity>
               )}
@@ -460,6 +483,12 @@ function formatEventTime(iso: string | null): string {
   return `${date} · ${time}`;
 }
 
+function friendsSummary(names: string[]): string {
+  if (names.length === 1) return `${names[0]} is going`;
+  if (names.length === 2) return `${names[0]} and ${names[1]} are going`;
+  return `${names[0]}, ${names[1]} and ${names.length - 2} more friends are going`;
+}
+
 function formatPosted(iso: string | null): string {
   if (!iso) return '';
   const d = new Date(iso.includes('T') ? iso : iso.replace(' ', 'T'));
@@ -495,6 +524,7 @@ const styles = StyleSheet.create({
   detailEmoji: { fontSize: 16 },
   detailText: { fontSize: 13, fontWeight: 'bold' },
   postedText: { fontSize: 12, fontWeight: '700', marginTop: Spacing.two },
+  friendsGoing: { fontSize: 13, fontWeight: '900', marginTop: Spacing.two },
   actionsRow: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.three },
   buttonText: { fontWeight: '900', color: '#000', fontSize: 14 },
   sectionTitle: { fontWeight: '900', fontSize: 16, letterSpacing: 0.5, marginTop: Spacing.two, marginBottom: Spacing.two },

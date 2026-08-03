@@ -55,6 +55,77 @@ export async function getFollowingIds(followerId: string): Promise<Set<string>> 
   return new Set((data ?? []).map((r: any) => r.following_id));
 }
 
+export interface FollowNotification {
+  profile: PublicProfile;
+  createdAt: string;
+  followsBack: boolean;
+}
+
+// People who follow me (newest first) = the "started following you" feed.
+export async function getFollowerNotifications(userId: string): Promise<FollowNotification[]> {
+  const [{ data: rows }, followingIds] = await Promise.all([
+    supabase
+      .from('follows')
+      .select('created_at, profile:profiles!follows_follower_id_fkey(id, username, display_name, avatar_url, bio)')
+      .eq('following_id', userId)
+      .order('created_at', { ascending: false }),
+    getFollowingIds(userId),
+  ]);
+  return (rows ?? [])
+    .filter((r: any) => r.profile)
+    .map((r: any) => ({ profile: r.profile, createdAt: r.created_at, followsBack: followingIds.has(r.profile.id) }));
+}
+
+export async function getNotificationsSeenAt(userId: string): Promise<string | null> {
+  const { data } = await supabase.from('profiles').select('notifications_seen_at').eq('id', userId).single();
+  return (data as any)?.notifications_seen_at ?? null;
+}
+
+export async function getUnreadFollowerCount(userId: string): Promise<number> {
+  const seenAt = await getNotificationsSeenAt(userId);
+  let req = supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', userId);
+  if (seenAt) req = req.gt('created_at', seenAt);
+  const { count } = await req;
+  return count ?? 0;
+}
+
+export async function markNotificationsSeen(userId: string): Promise<void> {
+  await supabase.from('profiles').update({ notifications_seen_at: new Date().toISOString() }).eq('id', userId);
+}
+
+// People I follow who also follow `targetId` — "followed by @x and N others".
+export async function getMutualFollowers(myId: string, targetId: string): Promise<{ names: string[]; count: number }> {
+  const followingIds = await getFollowingIds(myId);
+  if (followingIds.size === 0) return { names: [], count: 0 };
+  const { data } = await supabase
+    .from('follows')
+    .select('profile:profiles!follows_follower_id_fkey(username, display_name)')
+    .eq('following_id', targetId)
+    .in('follower_id', Array.from(followingIds));
+  const rows = data ?? [];
+  const names = rows
+    .map((r: any) => (r.profile?.username ? `@${r.profile.username}` : r.profile?.display_name))
+    .filter(Boolean) as string[];
+  return { names, count: names.length };
+}
+
+// "People you may know": profiles sharing at least one interest with me,
+// excluding myself, people I already follow, and blocked users.
+export async function getSuggestions(
+  myId: string,
+  myInterests: string[],
+  exclude: Set<string>
+): Promise<PublicProfile[]> {
+  if (!myInterests || myInterests.length === 0) return [];
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, username, display_name, avatar_url, bio')
+    .overlaps('interests', myInterests)
+    .neq('id', myId)
+    .limit(30);
+  return ((data ?? []) as PublicProfile[]).filter((p) => !exclude.has(p.id)).slice(0, 10);
+}
+
 // People who follow `userId`, or people `userId` follows.
 export async function getConnections(userId: string, type: 'followers' | 'following'): Promise<PublicProfile[]> {
   if (type === 'followers') {

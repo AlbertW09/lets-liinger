@@ -1,14 +1,16 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Badge } from '@/components/ui/badge';
+import { IconButton } from '@/components/ui/icon-button';
 import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { followUser, getFollowCounts, isFollowing as checkFollowing, unfollowUser } from '../../lib/follows';
+import { followUser, getFollowCounts, getMutualFollowers, isFollowing as checkFollowing, unfollowUser } from '../../lib/follows';
+import { blockUser, getMyBlockedIds, reportUser, unblockUser } from '../../lib/moderation';
 import { supabase } from '../../supabaseClient';
 
 interface ViewProfile {
@@ -32,6 +34,10 @@ export default function UserProfileScreen() {
   const [counts, setCounts] = useState({ followers: 0, following: 0 });
   const [following, setFollowing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [mutuals, setMutuals] = useState<{ names: string[]; count: number }>({ names: [], count: 0 });
+  const [blocked, setBlocked] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [reported, setReported] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -47,15 +53,19 @@ export default function UserProfileScreen() {
         }
         setSelfId(user?.id ?? null);
 
-        const [profRes, c, isF] = await Promise.all([
+        const [profRes, c, isF, mut, myBlocked] = await Promise.all([
           supabase.from('profiles').select('id, display_name, username, bio, avatar_url, interests, extracurriculars').eq('id', id).single(),
           getFollowCounts(id),
           user ? checkFollowing(user.id, id) : Promise.resolve(false),
+          user ? getMutualFollowers(user.id, id) : Promise.resolve({ names: [], count: 0 }),
+          user ? getMyBlockedIds(user.id) : Promise.resolve(new Set<string>()),
         ]);
         if (cancelled) return;
         if (!profRes.error) setProfile(profRes.data as ViewProfile);
         setCounts(c);
         setFollowing(isF);
+        setMutuals(mut);
+        setBlocked(myBlocked.has(id));
         setLoading(false);
       })();
       return () => { cancelled = true; };
@@ -75,6 +85,27 @@ export default function UserProfileScreen() {
       await followUser(selfId, id);
     }
     setBusy(false);
+  }
+
+  async function handleBlock() {
+    if (!selfId || !id) return;
+    setMenuVisible(false);
+    if (blocked) {
+      setBlocked(false);
+      await unblockUser(selfId, id);
+    } else {
+      setBlocked(true);
+      setFollowing(false);
+      await blockUser(selfId, id);
+      router.back();
+    }
+  }
+
+  async function handleReport() {
+    if (!selfId || !id) return;
+    setMenuVisible(false);
+    setReported(true);
+    await reportUser(selfId, id, 'reported from profile');
   }
 
   const clubColors = [colors.accentPink, colors.accentCyan, colors.accentYellow, colors.accentGreen];
@@ -103,9 +134,18 @@ export default function UserProfileScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <ThemedText style={[styles.back, { color: colors.text }]}>‹ back</ThemedText>
-        </TouchableOpacity>
+        <View style={styles.topRow}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <ThemedText style={[styles.back, { color: colors.text }]}>‹ back</ThemedText>
+          </TouchableOpacity>
+          {selfId && <IconButton emoji="⋯" onPress={() => setMenuVisible(true)} />}
+        </View>
+
+        {reported && (
+          <ThemedText style={styles.reported} themeColor="textSecondary">
+            ✓ Reported. Thanks — our team will review this.
+          </ThemedText>
+        )}
 
         <ShadowSurface backgroundColor={colors.backgroundElement} radius={24} offset={6} wrapperStyle={styles.mb4} style={styles.card}>
           <View style={[styles.avatar, { borderColor: colors.border, backgroundColor: colors.accentYellow }]}>
@@ -126,19 +166,34 @@ export default function UserProfileScreen() {
             </View>
           )}
 
+          {mutuals.count > 0 && (
+            <ThemedText style={styles.mutuals} themeColor="textSecondary">
+              👥 Followed by {mutuals.names.slice(0, 2).join(', ')}
+              {mutuals.count > 2 ? ` and ${mutuals.count - 2} others you follow` : ' you follow'}
+            </ThemedText>
+          )}
+
           {selfId && (
-            <ShadowSurface
-              backgroundColor={following ? colors.backgroundElement : colors.accentPink}
-              radius={14}
-              offset={3}
-              wrapperStyle={styles.followWrap}
-              style={styles.followBtn}
-              onPress={toggleFollow}
-            >
-              <ThemedText style={[styles.followText, { color: following ? colors.text : '#000' }]}>
-                {following ? '✓ FOLLOWING' : '+ FOLLOW'}
-              </ThemedText>
-            </ShadowSurface>
+            <View style={styles.actionRow}>
+              <ShadowSurface
+                backgroundColor={following ? colors.backgroundElement : colors.accentPink}
+                radius={14} offset={3}
+                wrapperStyle={styles.actionFlex} style={styles.followBtn}
+                onPress={toggleFollow}
+              >
+                <ThemedText style={[styles.followText, { color: following ? colors.text : '#000' }]}>
+                  {following ? '✓ FOLLOWING' : '+ FOLLOW'}
+                </ThemedText>
+              </ShadowSurface>
+              <ShadowSurface
+                backgroundColor={colors.accentCyan}
+                radius={14} offset={3}
+                wrapperStyle={styles.actionFlex} style={styles.followBtn}
+                onPress={() => router.push(`/dm-thread?userId=${profile.id}`)}
+              >
+                <ThemedText style={[styles.followText, { color: '#000' }]}>💬 MESSAGE</ThemedText>
+              </ShadowSurface>
+            </View>
           )}
         </ShadowSurface>
 
@@ -179,6 +234,21 @@ export default function UserProfileScreen() {
           </>
         )}
       </ScrollView>
+
+      <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
+        <Pressable style={styles.menuBackdrop} onPress={() => setMenuVisible(false)}>
+          <ShadowSurface backgroundColor={colors.backgroundElement} radius={16} offset={4} wrapperStyle={styles.menuShadow} style={styles.menu}>
+            <TouchableOpacity style={styles.menuItem} onPress={handleReport}>
+              <ThemedText style={styles.menuItemText}>🚩 Report</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={handleBlock}>
+              <ThemedText style={[styles.menuItemText, { color: colors.accentPink }]}>
+                {blocked ? '✓ Unblock' : '🚫 Block'}
+              </ThemedText>
+            </TouchableOpacity>
+          </ShadowSurface>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -187,8 +257,17 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   content: { padding: Spacing.four, paddingBottom: 130 },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  backBtn: { marginBottom: Spacing.two },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.two },
   back: { fontFamily: 'ui-rounded', fontWeight: '900', fontSize: 22, letterSpacing: -1 },
+  reported: { fontSize: 12, fontWeight: '700', marginBottom: Spacing.two, textAlign: 'center' },
+  mutuals: { fontSize: 12, fontWeight: '700', textAlign: 'center', marginTop: Spacing.one },
+  actionRow: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.two, width: '100%' },
+  actionFlex: { flex: 1 },
+  menuBackdrop: { flex: 1, alignItems: 'flex-end' },
+  menuShadow: { marginTop: 60, marginRight: Spacing.four },
+  menu: { minWidth: 160, paddingVertical: Spacing.one },
+  menuItem: { paddingVertical: Spacing.two, paddingHorizontal: Spacing.three },
+  menuItemText: { fontSize: 14, fontWeight: '900' },
   mb2: { marginBottom: Spacing.two },
   mb4: { marginBottom: Spacing.four },
   card: { padding: Spacing.four, alignItems: 'center' },
