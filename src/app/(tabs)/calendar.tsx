@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
     ScrollView,
@@ -10,7 +10,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Badge } from '@/components/ui/badge';
-import { IconButton } from '@/components/ui/icon-button';
 import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -26,8 +25,16 @@ interface CalendarEvent {
   color: string;
 }
 
+function prettyDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
+  if (isNaN(dt.getTime())) return dateStr;
+  return dt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 export default function CalendarScreen() {
   const colors = useTheme();
+  const router = useRouter();
 
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -235,7 +242,6 @@ export default function CalendarScreen() {
 
         <View style={styles.header}>
           <ThemedText style={dynamicStyles.headerText}>event calendar</ThemedText>
-          <IconButton emoji="⚡️" />
         </View>
 
         <ShadowSurface backgroundColor={colors.backgroundElement} radius={20} offset={5} wrapperStyle={styles.calendarShadow} style={styles.calendarCard}>
@@ -268,7 +274,7 @@ export default function CalendarScreen() {
 
         <View style={styles.sectionHeader}>
           <ThemedText style={styles.sectionTitle}>
-            📅 EVENTS FOR {selectedDateStr}
+            📅 {prettyDate(selectedDateStr)}
           </ThemedText>
         </View>
 
@@ -280,7 +286,15 @@ export default function CalendarScreen() {
           </ShadowSurface>
         ) : (
           selectedEvents.map((evt) => (
-            <ShadowSurface key={evt.id} backgroundColor={colors.backgroundElement} radius={18} offset={4} wrapperStyle={styles.eventCardShadow} style={styles.eventCard}>
+            <ShadowSurface
+              key={evt.id}
+              backgroundColor={colors.backgroundElement}
+              radius={18}
+              offset={4}
+              wrapperStyle={styles.eventCardShadow}
+              style={styles.eventCard}
+              onPress={() => router.push(`/event-detail?id=${evt.id}`)}
+            >
               <Badge label={evt.host} backgroundColor={evt.color} style={styles.hostBadge} />
 
               <ThemedText style={styles.eventTitle}>{evt.title}</ThemedText>
@@ -295,6 +309,8 @@ export default function CalendarScreen() {
                   <ThemedText style={styles.detailText}>{evt.location}</ThemedText>
                 </View>
               </View>
+
+              <ThemedText style={styles.tapHint} themeColor="textSecondary">Tap to view →</ThemedText>
             </ShadowSurface>
           ))
         )}
@@ -325,6 +341,7 @@ const styles = StyleSheet.create({
   eventCardShadow: { marginBottom: Spacing.three },
   eventCard: { padding: Spacing.three },
   hostBadge: { borderRadius: 8, marginBottom: Spacing.two },
+  tapHint: { fontSize: 11, fontWeight: '700', textAlign: 'right', marginTop: Spacing.two },
   monthHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -283,13 +283,16 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <ThemedText style={dynamicStyles.headerText}>LetsLiinger</ThemedText>
-          <View>
-            <IconButton emoji="🔔" size={20} onPress={() => router.push('/notifications')} />
-            {unreadNotifs > 0 && (
-              <View style={[styles.badge, { backgroundColor: colors.accentPink, borderColor: colors.border }]}>
-                <ThemedText style={styles.badgeText}>{unreadNotifs > 9 ? '9+' : unreadNotifs}</ThemedText>
-              </View>
-            )}
+          <View style={styles.headerActions}>
+            <IconButton emoji="🔎" size={20} onPress={() => router.push('/search')} />
+            <View>
+              <IconButton emoji="🔔" size={20} onPress={() => router.push('/notifications')} />
+              {unreadNotifs > 0 && (
+                <View style={[styles.badge, { backgroundColor: colors.accentPink, borderColor: colors.border }]}>
+                  <ThemedText style={styles.badgeText}>{unreadNotifs > 9 ? '9+' : unreadNotifs}</ThemedText>
+                </View>
+              )}
+            </View>
           </View>
         </View>
 
@@ -300,16 +303,19 @@ export default function HomeScreen() {
           wrapperStyle={styles.searchShadow}
           style={styles.searchContainer}
         >
+          <ThemedText style={styles.searchIcon}>🔍</ThemedText>
           <TextInput
             style={dynamicStyles.input}
-            placeholder="Search flyers, clubs, events..."
+            placeholder="Search events…"
             placeholderTextColor={colors.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
-          <TouchableOpacity style={dynamicStyles.searchBtn}>
-            <ThemedText style={styles.boldText}>GO!</ThemedText>
-          </TouchableOpacity>
+          {searchQuery.length > 0 && (
+            <TouchableOpacity style={dynamicStyles.searchBtn} onPress={() => setSearchQuery('')}>
+              <ThemedText style={styles.boldText}>✕</ThemedText>
+            </TouchableOpacity>
+          )}
         </ShadowSurface>
 
         <ShadowSurface
@@ -491,8 +497,10 @@ const styles = StyleSheet.create({
     alignItems: 'center', marginBottom: Spacing.two,
   },
   boldText: { fontWeight: '900', color: '#000', fontSize: 14 },
+  headerActions: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' },
   searchShadow: { marginTop: Spacing.two, marginBottom: Spacing.three },
   searchContainer: { flexDirection: 'row', alignItems: 'center', padding: Spacing.one },
+  searchIcon: { fontSize: 15, paddingLeft: Spacing.two },
   createShadow: { marginBottom: Spacing.three },
   createBtn: { paddingVertical: Spacing.two, alignItems: 'center' },
   sortRow: { flexDirection: 'row', gap: Spacing.two, marginBottom: Spacing.three },

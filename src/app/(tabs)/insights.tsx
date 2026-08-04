@@ -36,6 +36,7 @@ export default function InsightsScreen() {
     }, [])
   );
 
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
   const accents = [colors.accentPink, colors.accentCyan, colors.accentYellow, colors.accentGreen];
   const maxRsvps = Math.max(1, ...(data?.events.map((e) => e.rsvps) ?? [0]));
 
@@ -98,7 +99,7 @@ export default function InsightsScreen() {
             </View>
 
             <ThemedText style={styles.avgLine} themeColor="textSecondary">
-              📈 You average {data.avgRsvps} RSVPs per event.
+              📈 You average {plural(data.avgRsvps, 'RSVP')} per event.
             </ThemedText>
 
             {/* Top event */}
@@ -164,7 +165,7 @@ export default function InsightsScreen() {
                   <Badge label={`⚡️ ${e.engagement}`} backgroundColor={colors.accentGreen} />
                 </View>
                 <ThemedText style={styles.rowMeta} themeColor="textSecondary">
-                  🎟️ {e.rsvps} going · 💖 {e.likes} likes · 💬 {e.comments} comments
+                  🎟️ {e.rsvps} going · 💖 {plural(e.likes, 'like')} · 💬 {plural(e.comments, 'comment')}
                 </ThemedText>
               </ShadowSurface>
             ))}
