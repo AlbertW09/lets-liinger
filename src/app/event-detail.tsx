@@ -12,8 +12,8 @@ import { IconButton } from '@/components/ui/icon-button';
 import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { getFollowingIds } from '../../lib/follows';
-import { supabase } from '../../supabaseClient';
+import { getFollowingIds } from '../lib/follows';
+import { supabase } from '../supabaseClient';
 
 interface Comment {
   id: string;
@@ -279,7 +279,7 @@ export default function EventDetailScreen() {
     return (
       <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right']}>
         <View style={styles.content}>
-          <TouchableOpacity onPress={() => router.replace('/')}>
+          <TouchableOpacity onPress={() => router.back()}>
             <ThemedText style={dynamicStyles.headerText}>‹ back</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.noteText} themeColor="textSecondary">Event not found.</ThemedText>
@@ -292,7 +292,7 @@ export default function EventDetailScreen() {
     <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.topRow}>
-          <TouchableOpacity onPress={() => router.replace('/')} style={styles.backBtn}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <ThemedText style={dynamicStyles.headerText}>‹ back</ThemedText>
           </TouchableOpacity>
 

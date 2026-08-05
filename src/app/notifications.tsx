@@ -9,8 +9,8 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   FollowNotification, followUser, getFollowerNotifications, markNotificationsSeen, unfollowUser,
-} from '../../lib/follows';
-import { supabase } from '../../supabaseClient';
+} from '../lib/follows';
+import { supabase } from '../supabaseClient';
 
 function relative(iso: string): string {
   const d = new Date(iso);
@@ -70,7 +70,7 @@ export default function NotificationsScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity onPress={() => router.replace('/')} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <ThemedText style={[styles.back, { color: colors.text }]}>‹ back</ThemedText>
         </TouchableOpacity>
         <ThemedText style={[styles.title, { color: colors.text }]}>🔔 notifications</ThemedText>
