@@ -77,6 +77,18 @@ function distanceKm(a: Coords, b: Coords): number {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+// `event_time` is stored as a naive local timestamp (no timezone — see
+// toEventTimeIso in event-form-modal.tsx), so "now" for comparison has to be
+// built the same way instead of via toISOString(), which would shift by the
+// device's UTC offset and mis-filter events near the day boundary.
+function nowAsNaiveTimestamp(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+const PAGE_SIZE = 20;
+
 // Browser-only geolocation, guarded for SSR.
 function getCurrentCoords(): Promise<Coords | null> {
   return new Promise((resolve) => {
@@ -106,19 +118,32 @@ export default function HomeScreen() {
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [createVisible, setCreateVisible] = useState(false);
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [showPast, setShowPast] = useState(false);
 
   const fetchAll = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     setUserId(user?.id ?? null);
 
-    const [eventsRes, likesRes, rsvpsRes, following, blocked, unread] = await Promise.all([
-      supabase
-        .from('events')
-        .select('id, title, description, location, event_time, latitude, longitude, created_at, host, created_by, creator:profiles!events_created_by_fkey(username, display_name)'),
-      supabase.from('event_likes').select('event_id, user_id'),
-      supabase
-        .from('rsvps')
-        .select('event_id, user_id, profile:profiles!rsvps_user_id_fkey(username, display_name)'),
+    // Default to upcoming events only (plus ones with no time set yet); page
+    // through the rest with `limit` instead of pulling the whole table.
+    let eventsQuery = supabase
+      .from('events')
+      .select(
+        'id, title, description, location, event_time, latitude, longitude, created_at, host, created_by, creator:profiles!events_created_by_fkey(username, display_name)',
+        { count: 'exact' }
+      )
+      .order('created_at', { ascending: false })
+      .range(0, limit - 1);
+
+    if (!showPast) {
+      eventsQuery = eventsQuery.or(`event_time.is.null,event_time.gte.${nowAsNaiveTimestamp()}`);
+    }
+
+    const [eventsRes, following, blocked, unread] = await Promise.all([
+      eventsQuery,
       user ? getFollowingIds(user.id) : Promise.resolve(new Set<string>()),
       user ? getBlockedIds(user.id) : Promise.resolve(new Set<string>()),
       user ? getUnreadFollowerCount(user.id) : Promise.resolve(0),
@@ -129,6 +154,19 @@ export default function HomeScreen() {
 
     // Hide events posted by people you've blocked (or who blocked you).
     const rawEvents = (eventsRes.data ?? []).filter((e: any) => !e.created_by || !blocked.has(e.created_by));
+    setHasMore((eventsRes.count ?? 0) > limit);
+
+    // Likes/RSVPs only need to cover the events actually on this page.
+    const eventIds = rawEvents.map((e: any) => e.id);
+    const [likesRes, rsvpsRes] = eventIds.length
+      ? await Promise.all([
+          supabase.from('event_likes').select('event_id, user_id').in('event_id', eventIds),
+          supabase
+            .from('rsvps')
+            .select('event_id, user_id, profile:profiles!rsvps_user_id_fkey(username, display_name)')
+            .in('event_id', eventIds),
+        ])
+      : [{ data: [] as any[] }, { data: [] as any[] }];
     const likes = likesRes.data ?? [];
     const rsvps = rsvpsRes.data ?? [];
 
@@ -170,7 +208,8 @@ export default function HomeScreen() {
 
     setEvents(enriched);
     setLoading(false);
-  }, [userCoords]);
+    setLoadingMore(false);
+  }, [userCoords, limit, showPast]);
 
   useFocusEffect(
     useCallback(() => {
@@ -178,24 +217,58 @@ export default function HomeScreen() {
     }, [fetchAll])
   );
 
+  function loadMore() {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    setLimit((l) => l + PAGE_SIZE);
+  }
+
+  function togglePast() {
+    setLimit(PAGE_SIZE);
+    setShowPast((v) => !v);
+  }
+
+  // Optimistic: flip local state immediately, hit the DB in the background,
+  // and roll back only if the write actually fails. Avoids refetching every
+  // event/like/rsvp in the feed for a single-row change.
   async function toggleRsvp(ev: EnrichedEvent) {
     if (!userId) return;
-    if (ev.rsvpedByMe) {
-      await supabase.from('rsvps').delete().eq('event_id', ev.id).eq('user_id', userId);
-    } else {
-      await supabase.from('rsvps').insert({ event_id: ev.id, user_id: userId });
-    }
-    fetchAll();
+    const wasRsvped = ev.rsvpedByMe;
+    const prevEvents = events;
+
+    setEvents((prev) =>
+      prev.map((e) =>
+        e.id === ev.id
+          ? { ...e, rsvpedByMe: !wasRsvped, rsvpCount: e.rsvpCount + (wasRsvped ? -1 : 1) }
+          : e
+      )
+    );
+
+    const { error } = wasRsvped
+      ? await supabase.from('rsvps').delete().eq('event_id', ev.id).eq('user_id', userId)
+      : await supabase.from('rsvps').insert({ event_id: ev.id, user_id: userId });
+
+    if (error) setEvents(prevEvents);
   }
 
   async function toggleLike(ev: EnrichedEvent) {
     if (!userId) return;
-    if (ev.likedByMe) {
-      await supabase.from('event_likes').delete().eq('event_id', ev.id).eq('user_id', userId);
-    } else {
-      await supabase.from('event_likes').insert({ event_id: ev.id, user_id: userId });
-    }
-    fetchAll();
+    const wasLiked = ev.likedByMe;
+    const prevEvents = events;
+
+    setEvents((prev) =>
+      prev.map((e) =>
+        e.id === ev.id
+          ? { ...e, likedByMe: !wasLiked, likeCount: e.likeCount + (wasLiked ? -1 : 1) }
+          : e
+      )
+    );
+
+    const { error } = wasLiked
+      ? await supabase.from('event_likes').delete().eq('event_id', ev.id).eq('user_id', userId)
+      : await supabase.from('event_likes').insert({ event_id: ev.id, user_id: userId });
+
+    if (error) setEvents(prevEvents);
   }
 
   async function handleCreateSubmit(values: EventFormSubmitValues) {
@@ -339,6 +412,12 @@ export default function HomeScreen() {
             />
           ))}
           <Chip
+            label="🕰️ Past"
+            selected={showPast}
+            selectedColor={colors.accentCyan}
+            onPress={togglePast}
+          />
+          <Chip
             label="👥 Following"
             selected={followingOnly}
             selectedColor={colors.accentGreen}
@@ -459,6 +538,20 @@ export default function HomeScreen() {
             </ShadowSurface>
           ))
         )}
+
+        {!loading && hasMore && (
+          <TouchableOpacity
+            style={[styles.loadMoreBtn, { borderColor: colors.border }]}
+            onPress={loadMore}
+            disabled={loadingMore}
+          >
+            {loadingMore ? (
+              <ActivityIndicator size="small" color={colors.text} />
+            ) : (
+              <ThemedText style={styles.loadMoreText}>Load more events</ThemedText>
+            )}
+          </TouchableOpacity>
+        )}
       </ScrollView>
 
       <EventFormModal
@@ -536,4 +629,9 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two, gap: Spacing.two, flexWrap: 'wrap',
   },
   postedText: { fontSize: 11, fontWeight: '700' },
+  loadMoreBtn: {
+    borderWidth: 2, borderRadius: 12, paddingVertical: Spacing.two,
+    alignItems: 'center', marginTop: Spacing.two,
+  },
+  loadMoreText: { fontSize: 13, fontWeight: '900' },
 });
