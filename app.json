@@ -8,7 +8,12 @@
     "scheme": "letsliinger",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "LetsLiinger uses your location to show events happening near you and to place event pins on the campus map. You can decline and still use the app.",
+        "NSPhotoLibraryUsageDescription": "LetsLiinger needs access to your photos so you can set a profile picture and add a cover image to your events.",
+        "NSCameraUsageDescription": "LetsLiinger uses your camera so you can take a new profile picture or event photo."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -17,7 +22,13 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
+      ]
     },
     "web": {
       "output": "static",

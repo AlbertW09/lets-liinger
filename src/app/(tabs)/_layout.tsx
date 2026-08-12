@@ -11,6 +11,9 @@ export default function TabLayout() {
       <Tabs.Screen name="user" options={{ href: null }} />
       <Tabs.Screen name="connections" options={{ href: null }} />
       <Tabs.Screen name="notifications" options={{ href: null }} />
+      <Tabs.Screen name="settings" options={{ href: null }} />
+      <Tabs.Screen name="legal" options={{ href: null }} />
+      <Tabs.Screen name="moderation" options={{ href: null }} />
     </Tabs>
   );
 }

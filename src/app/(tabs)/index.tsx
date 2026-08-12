@@ -21,7 +21,13 @@ import { getFollowingIds, getUnreadFollowerCount } from '../../lib/follows';
 import { getBlockedIds } from '../../lib/moderation';
 import { supabase } from '../../supabaseClient';
 
-type SortMode = 'popular' | 'recent' | 'nearby';
+type SortMode = 'upcoming' | 'popular' | 'recent' | 'nearby';
+
+function eventTimeMs(iso: string | null): number | null {
+  if (!iso) return null;
+  const d = new Date(iso.includes('T') ? iso : iso.replace(' ', 'T'));
+  return isNaN(d.getTime()) ? null : d.getTime();
+}
 
 interface Coords {
   lat: number;
@@ -101,7 +107,7 @@ export default function HomeScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [userCoords, setUserCoords] = useState<Coords | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortMode, setSortMode] = useState<SortMode>('recent');
+  const [sortMode, setSortMode] = useState<SortMode>('upcoming');
   const [followingOnly, setFollowingOnly] = useState(false);
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
   const [unreadNotifs, setUnreadNotifs] = useState(0);
@@ -238,6 +244,18 @@ export default function HomeScreen() {
       );
     })
     .sort((a, b) => {
+      if (sortMode === 'upcoming') {
+        const now = Date.now();
+        const ta = eventTimeMs(a.event_time);
+        const tb = eventTimeMs(b.event_time);
+        const aFuture = ta != null && ta >= now;
+        const bFuture = tb != null && tb >= now;
+        if (aFuture && bFuture) return ta! - tb!;   // soonest upcoming first
+        if (aFuture) return -1;
+        if (bFuture) return 1;
+        if (ta != null && tb != null) return tb - ta; // then most recent past
+        return b.created_at.localeCompare(a.created_at);
+      }
       if (sortMode === 'popular') {
         if (b.likeCount !== a.likeCount) return b.likeCount - a.likeCount;
         return b.created_at.localeCompare(a.created_at);
@@ -273,6 +291,7 @@ export default function HomeScreen() {
   }), [colors]);
 
   const sortOptions: { key: SortMode; label: string }[] = [
+    { key: 'upcoming', label: '📅 Upcoming' },
     { key: 'recent', label: '🆕 Recent' },
     { key: 'popular', label: '🔥 Popular' },
     { key: 'nearby', label: '📍 Nearby' },

@@ -11,6 +11,7 @@ import { useTheme } from '@/hooks/use-theme';
 import {
   DirectMessage, ProfileLite, fetchProfile, fetchThread, profileLabel, sendDirectMessage, subscribeToMyMessages,
 } from '@/lib/messages';
+import { checkClean } from '../../lib/profanity';
 import { supabase } from '../../supabaseClient';
 
 function formatMessageTime(iso: string): string {
@@ -30,6 +31,7 @@ export default function DmThreadScreen() {
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
   const seenIds = useRef<Set<string>>(new Set());
 
   const fetchAll = useCallback(async () => {
@@ -76,6 +78,12 @@ export default function DmThreadScreen() {
   async function handleSend() {
     const text = newMessage.trim();
     if (!text || !myUserId || !otherUserId || sending) return;
+    const badWord = checkClean(text);
+    if (badWord) {
+      setSendError(badWord);
+      return;
+    }
+    setSendError('');
     setSending(true);
     const { error } = await sendDirectMessage(myUserId, otherUserId, text);
     setSending(false);
@@ -157,6 +165,10 @@ export default function DmThreadScreen() {
         }
       />
 
+      {sendError ? (
+        <ThemedText style={styles.sendError}>{sendError}</ThemedText>
+      ) : null}
+
       <View style={styles.composerRow}>
         <TextInput
           style={dynamicStyles.input}
@@ -195,4 +207,5 @@ const styles = StyleSheet.create({
     padding: Spacing.four, paddingTop: Spacing.two,
   },
   sendBtnText: { fontWeight: '900', color: '#000', fontSize: 14 },
+  sendError: { color: '#ff6b6b', fontWeight: '700', fontSize: 12, paddingHorizontal: Spacing.three, marginBottom: Spacing.one },
 });

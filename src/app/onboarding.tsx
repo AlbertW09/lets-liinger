@@ -13,6 +13,7 @@ import { Spacing } from '@/constants/theme';
 import { useClubs } from '@/hooks/use-clubs';
 import { useTheme } from '@/hooks/use-theme';
 import { pickImageFile, uploadAvatar } from '../lib/avatar';
+import { checkClean } from '../lib/profanity';
 import { supabase } from '../supabaseClient';
 
 const INTEREST_OPTIONS = [
@@ -67,6 +68,11 @@ export default function OnboardingScreen() {
       setErrorMsg('Please pick a username.');
       return;
     }
+    const badWord = checkClean(`${displayName} ${username} ${bio}`);
+    if (badWord) {
+      setErrorMsg(badWord);
+      return;
+    }
 
     setSaving(true);
 
@@ -87,6 +93,8 @@ export default function OnboardingScreen() {
         interests,
         extracurriculars: myClubs.map(name => ({ name, role: 'Member' })),
         onboarded: true,
+        terms_accepted_at:
+          (user.user_metadata as any)?.terms_accepted_at ?? new Date().toISOString(),
       })
       .eq('id', user.id);
 

@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import {
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  Pressable,
+  ScrollView,
   StyleSheet,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +16,7 @@ import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { PRIVACY_TEXT, TERMS_TEXT } from '../lib/legal';
 import { supabase } from '../supabaseClient';
 
 export default function AuthScreen() {
@@ -23,11 +28,35 @@ export default function AuthScreen() {
   const [errorMsg, setErrorMsg] = useState('');
   const [infoMsg, setInfoMsg] = useState('');
 
+  // Age gate + Terms acceptance are required to create an account (store rule).
+  const [is13, setIs13] = useState(false);
+  const [agreedTerms, setAgreedTerms] = useState(false);
+  const [legalDoc, setLegalDoc] = useState<null | 'terms' | 'privacy'>(null);
+
   async function handleSignUp() {
-    setLoading(true);
     setErrorMsg('');
     setInfoMsg('');
-    const { data, error } = await supabase.auth.signUp({ email, password });
+
+    if (!is13) {
+      setErrorMsg('You must be 13 or older to create an account.');
+      return;
+    }
+    if (!agreedTerms) {
+      setErrorMsg('Please agree to the Terms and Privacy Policy to continue.');
+      return;
+    }
+
+    setLoading(true);
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          age_confirmed: true,
+          terms_accepted_at: new Date().toISOString(),
+        },
+      },
+    });
     if (error) {
       setErrorMsg(error.message);
     } else if (!data.session) {
@@ -50,20 +79,52 @@ export default function AuthScreen() {
     setLoading(false);
   }
 
+  const legalText = legalDoc === 'privacy' ? PRIVACY_TEXT : TERMS_TEXT;
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right', 'bottom']}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.content}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <ThemedText style={[styles.title, { color: colors.text }]}>LetsLiinger</ThemedText>
           <ThemedText style={styles.subtitle} themeColor="textSecondary">
-            See what's happenin
+            See what&apos;s happenin
           </ThemedText>
 
           <TextField label="Email" placeholder="you@email.com" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" value={email} onChangeText={setEmail} />
           <TextField label="Password" secureTextEntry value={password} onChangeText={setPassword} />
+
+          {/* Age gate + Terms — required for account creation */}
+          <View style={styles.checksWrap}>
+            <Checkbox
+              checked={is13}
+              onToggle={() => setIs13((v) => !v)}
+              borderColor={colors.border}
+              checkColor={colors.accentGreen}
+            >
+              <ThemedText style={styles.checkLabel}>I&apos;m 13 years or older</ThemedText>
+            </Checkbox>
+
+            <Checkbox
+              checked={agreedTerms}
+              onToggle={() => setAgreedTerms((v) => !v)}
+              borderColor={colors.border}
+              checkColor={colors.accentGreen}
+            >
+              <ThemedText style={styles.checkLabel}>
+                I agree to the{' '}
+                <ThemedText style={[styles.link, { color: colors.accentCyan }]} onPress={() => setLegalDoc('terms')}>
+                  Terms
+                </ThemedText>{' '}
+                and{' '}
+                <ThemedText style={[styles.link, { color: colors.accentCyan }]} onPress={() => setLegalDoc('privacy')}>
+                  Privacy Policy
+                </ThemedText>
+              </ThemedText>
+            </Checkbox>
+          </View>
 
           {errorMsg ? <ThemedText style={styles.error}>{errorMsg}</ThemedText> : null}
           {infoMsg ? (
@@ -93,25 +154,76 @@ export default function AuthScreen() {
           >
             <ThemedText style={styles.buttonText}>Create Account</ThemedText>
           </ShadowSurface>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Legal text modal (works pre-auth, where in-app routes aren't reachable) */}
+      <Modal visible={legalDoc !== null} animationType="slide" onRequestClose={() => setLegalDoc(null)}>
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+          <View style={styles.modalHeader}>
+            <Pressable onPress={() => setLegalDoc(null)}>
+              <ThemedText style={[styles.modalClose, { color: colors.text }]}>‹ back</ThemedText>
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <ThemedText style={styles.legalBody}>{legalText}</ThemedText>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
+  );
+}
+
+function Checkbox({
+  checked,
+  onToggle,
+  borderColor,
+  checkColor,
+  children,
+}: {
+  checked: boolean;
+  onToggle: () => void;
+  borderColor: string;
+  checkColor: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <TouchableOpacity style={styles.checkRow} onPress={onToggle} activeOpacity={0.7}>
+      <View style={[styles.checkbox, { borderColor }, checked && { backgroundColor: checkColor }]}>
+        {checked ? <ThemedText style={styles.checkMark}>✓</ThemedText> : null}
+      </View>
+      <View style={styles.checkTextWrap}>{children}</View>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   flex: { flex: 1 },
-  content: { flex: 1, justifyContent: 'center', padding: Spacing.four },
+  content: { flexGrow: 1, justifyContent: 'center', padding: Spacing.four },
   title: {
     fontFamily: 'Helvetica', fontWeight: '900',
     fontSize: 40, letterSpacing: -1, textAlign: 'center',
   },
   subtitle: { textAlign: 'center', marginTop: Spacing.two, marginBottom: Spacing.six },
+  checksWrap: { marginTop: Spacing.four, gap: Spacing.two },
+  checkRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  checkbox: {
+    width: 24, height: 24, borderRadius: 6, borderWidth: 2,
+    alignItems: 'center', justifyContent: 'center', marginRight: Spacing.two, marginTop: 1,
+  },
+  checkMark: { fontSize: 14, fontWeight: '900', color: '#000' },
+  checkTextWrap: { flex: 1 },
+  checkLabel: { fontSize: 13, fontWeight: '700', lineHeight: 20 },
+  link: { fontWeight: '900', textDecorationLine: 'underline' },
   btn: { paddingVertical: Spacing.three, alignItems: 'center' },
   signInShadow: { marginTop: Spacing.five },
   signUpShadow: { marginTop: Spacing.three },
   buttonText: { fontWeight: '900', color: '#000', fontSize: 14 },
   error: { color: '#ff6b6b', fontWeight: '700', marginTop: Spacing.three, textAlign: 'center' },
   info: { fontWeight: '700', marginTop: Spacing.three, textAlign: 'center' },
+  modalHeader: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two },
+  modalClose: { fontFamily: 'ui-rounded', fontWeight: '900', fontSize: 24, letterSpacing: -1 },
+  modalContent: { padding: Spacing.four },
+  legalBody: { fontSize: 14, fontWeight: '500', lineHeight: 22 },
 });

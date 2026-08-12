@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ClubChipPicker } from '@/components/club-chip-picker';
 import { DateTimeField } from '@/components/date-time-field';
 import { PlaceSearchField } from '@/components/place-search-field';
 import { ThemedText } from '@/components/themed-text';
+import { Chip } from '@/components/ui/chip';
 import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
@@ -14,6 +14,8 @@ import { usePlaceSearch } from '@/hooks/use-place-search';
 import { useTheme } from '@/hooks/use-theme';
 import { clubLabel } from '@/lib/clubs';
 import { PlaceResult } from '@/lib/places';
+import { checkClean } from '@/lib/profanity';
+import { supabase } from '../supabaseClient';
 
 export interface EventFormInitialValues {
   title: string;
@@ -82,6 +84,7 @@ export function EventFormModal({ visible, mode, initialValues, onClose, onSubmit
   const [host, setHost] = useState('');
   const [date, setDate] = useState<Date | null>(null);
   const [time, setTime] = useState<Date | null>(null);
+  const [myClubs, setMyClubs] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -96,6 +99,15 @@ export function EventFormModal({ visible, mode, initialValues, onClose, onSubmit
     setTime(parseInitialTime(initialValues));
     setFormError('');
     place.reset(parseInitialPlace(initialValues));
+    // Pull the clubs the user belongs to (from their profile) so they show up
+    // as one-tap host suggestions.
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from('profiles').select('extracurriculars').eq('id', user.id).single();
+      const names = ((data as any)?.extracurriculars ?? []).map((c: any) => c.name).filter(Boolean);
+      setMyClubs(names);
+    })();
     // Only re-seed when the modal transitions open, not on every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
@@ -114,6 +126,11 @@ export function EventFormModal({ visible, mode, initialValues, onClose, onSubmit
       setFormError('Pick a location from the search results.');
       return;
     }
+    const badWord = checkClean(`${title} ${description} ${host}`);
+    if (badWord) {
+      setFormError(badWord);
+      return;
+    }
 
     setSaving(true);
     const result = await onSubmit({
@@ -129,9 +146,14 @@ export function EventFormModal({ visible, mode, initialValues, onClose, onSubmit
       setFormError(result.error);
       return;
     }
+    // Remember a freshly-typed club so it's suggested next time (for everyone).
+    if (host.trim()) createClub(host.trim(), '');
     onSuccess();
     onClose();
   }
+
+  // Your own clubs first, then any other clubs people have used before.
+  const hostSuggestions = Array.from(new Set([...myClubs, ...clubs.map(clubLabel)]));
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -157,13 +179,18 @@ export function EventFormModal({ visible, mode, initialValues, onClose, onSubmit
 
           <PlaceSearchField search={place} />
 
-          <ThemedText style={styles.label} themeColor="accentCyan">Hosting club (optional)</ThemedText>
-          <ClubChipPicker
-            clubs={clubs}
-            isSelected={(label) => host === label}
-            onToggle={(label) => setHost(host === label ? '' : label)}
-            onClubCreated={(created) => setHost(clubLabel(created))}
-            createClub={createClub}
+          <ThemedText style={styles.label} themeColor="accentCyan">Hosting club / org (optional)</ThemedText>
+          {hostSuggestions.length > 0 && (
+            <View style={styles.clubSuggest}>
+              {hostSuggestions.map((label) => (
+                <Chip key={label} label={label} selected={host === label} onPress={() => setHost(host === label ? '' : label)} />
+              ))}
+            </View>
+          )}
+          <TextField
+            placeholder="Type a club or org…"
+            value={host}
+            onChangeText={setHost}
           />
 
           <ThemedText style={styles.label} themeColor="accentCyan">Date</ThemedText>
@@ -205,6 +232,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: '900' },
   spacer: { width: 50 },
   multiline: { height: 80, textAlignVertical: 'top' },
+  clubSuggest: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, marginBottom: Spacing.two },
   label: {
     fontSize: 12, fontWeight: '900', marginBottom: Spacing.two, marginTop: Spacing.three, letterSpacing: 0.5,
   },
