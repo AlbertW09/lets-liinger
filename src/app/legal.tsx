@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { PRIVACY_TEXT, TERMS_TEXT } from '../../lib/legal';
+import { PRIVACY_TEXT, TERMS_TEXT } from '../lib/legal';
 
 export default function LegalScreen() {
   const colors = useTheme();

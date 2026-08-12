@@ -9,9 +9,9 @@ import { IconButton } from '@/components/ui/icon-button';
 import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { followUser, getFollowCounts, getMutualFollowers, isFollowing as checkFollowing, unfollowUser } from '../../lib/follows';
-import { blockUser, getMyBlockedIds, reportUser, unblockUser } from '../../lib/moderation';
-import { supabase } from '../../supabaseClient';
+import { followUser, getFollowCounts, getMutualFollowers, isFollowing as checkFollowing, unfollowUser } from '../lib/follows';
+import { blockUser, getMyBlockedIds, reportUser, unblockUser } from '../lib/moderation';
+import { supabase } from '../supabaseClient';
 
 interface ViewProfile {
   id: string;

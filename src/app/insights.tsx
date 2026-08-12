@@ -8,8 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { CreatorInsights, EventStat, fetchCreatorInsights } from '../../lib/insights';
-import { supabase } from '../../supabaseClient';
+import { CreatorInsights, EventStat, fetchCreatorInsights } from '../lib/insights';
+import { supabase } from '../supabaseClient';
 
 export default function InsightsScreen() {
   const colors = useTheme();
@@ -51,7 +51,7 @@ export default function InsightsScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity onPress={() => router.replace('/profile')} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <ThemedText style={[styles.back, { color: colors.text }]}>‹ back</ThemedText>
         </TouchableOpacity>
         <ThemedText style={[styles.title, { color: colors.text }]}>📊 event insights</ThemedText>

@@ -38,8 +38,12 @@ export default function RootLayout() {
       if (seg !== 'auth') router.replace('/auth');
     } else if (!onboarded) {
       if (seg !== 'onboarding') router.replace('/onboarding');
-    } else {
-      if (seg !== '(tabs)') router.replace('/(tabs)');
+    } else if (seg === 'auth' || seg === 'onboarding' || seg === undefined) {
+      // Only steer people off the gate screens (or the bare root on cold
+      // start). Once signed in and onboarded, any other route — a (tabs)
+      // screen or a pushed detail screen like /user or /event-detail — is a
+      // valid destination and shouldn't be force-redirected to /(tabs).
+      router.replace('/(tabs)');
     }
   }, [session, loading, segments]);
 

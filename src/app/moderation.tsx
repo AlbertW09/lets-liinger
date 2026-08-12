@@ -22,8 +22,8 @@ import {
   reviewReport,
   type ModerationReport,
   type ReportStatus,
-} from '../../lib/moderation';
-import { supabase } from '../../supabaseClient';
+} from '../lib/moderation';
+import { supabase } from '../supabaseClient';
 
 const TABS: ReportStatus[] = ['open', 'resolved', 'dismissed'];
 
@@ -97,7 +97,7 @@ export default function ModerationScreen() {
   return (
     <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity onPress={() => router.replace('/settings')}>
+        <TouchableOpacity onPress={() => router.back()}>
           <ThemedText style={dynamicStyles.headerText}>‹ reports</ThemedText>
         </TouchableOpacity>
 

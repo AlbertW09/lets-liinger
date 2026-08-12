@@ -13,8 +13,8 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useClubs } from '@/hooks/use-clubs';
 import { useTheme } from '@/hooks/use-theme';
-import { pickImageFile, uploadAvatar } from '../../lib/avatar';
-import { supabase } from '../../supabaseClient';
+import { pickImageFile, uploadAvatar } from '../lib/avatar';
+import { supabase } from '../supabaseClient';
 
 const INTEREST_OPTIONS = [
   'Music', 'Greek Life', 'Sports', 'Gaming / Esports', 'Art & Design',
@@ -157,7 +157,7 @@ export default function EditProfileScreen() {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.replace('/profile')}>
+          <TouchableOpacity onPress={() => router.back()}>
             <ThemedText style={[styles.headerText, { color: colors.text }]}>‹ back</ThemedText>
           </TouchableOpacity>
         </View>

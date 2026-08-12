@@ -14,9 +14,9 @@ import { ThemedText } from '@/components/themed-text';
 import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { deleteAccount } from '../../lib/account';
-import { isModerator } from '../../lib/moderation';
-import { supabase } from '../../supabaseClient';
+import { deleteAccount } from '../lib/account';
+import { isModerator } from '../lib/moderation';
+import { supabase } from '../supabaseClient';
 
 export default function SettingsScreen() {
   const colors = useTheme();
@@ -74,7 +74,7 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity onPress={() => router.replace('/profile')}>
+        <TouchableOpacity onPress={() => router.back()}>
           <ThemedText style={dynamicStyles.headerText}>‹ settings</ThemedText>
         </TouchableOpacity>
 

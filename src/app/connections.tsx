@@ -8,8 +8,8 @@ import { ThemedText } from '@/components/themed-text';
 import { Chip } from '@/components/ui/chip';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { followUser, getConnections, getFollowingIds, PublicProfile, unfollowUser } from '../../lib/follows';
-import { supabase } from '../../supabaseClient';
+import { followUser, getConnections, getFollowingIds, PublicProfile, unfollowUser } from '../lib/follows';
+import { supabase } from '../supabaseClient';
 
 export default function ConnectionsScreen() {
   const colors = useTheme();

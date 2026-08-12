@@ -8,9 +8,9 @@ import { ThemedText } from '@/components/themed-text';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { followUser, getFollowingIds, getSuggestions, PublicProfile, searchProfiles, unfollowUser } from '../../lib/follows';
-import { getBlockedIds } from '../../lib/moderation';
-import { supabase } from '../../supabaseClient';
+import { followUser, getFollowingIds, getSuggestions, PublicProfile, searchProfiles, unfollowUser } from '../lib/follows';
+import { getBlockedIds } from '../lib/moderation';
+import { supabase } from '../supabaseClient';
 
 export default function SearchScreen() {
   const colors = useTheme();
@@ -83,7 +83,7 @@ export default function SearchScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        <TouchableOpacity onPress={() => router.replace('/profile')} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <ThemedText style={[styles.back, { color: colors.text }]}>‹ back</ThemedText>
         </TouchableOpacity>
         <ThemedText style={[styles.title, { color: colors.text }]}>🔎 find people</ThemedText>
