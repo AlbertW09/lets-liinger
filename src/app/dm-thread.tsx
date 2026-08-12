@@ -11,7 +11,7 @@ import { useTheme } from '@/hooks/use-theme';
 import {
   DirectMessage, ProfileLite, fetchProfile, fetchThread, profileLabel, sendDirectMessage, subscribeToMyMessages,
 } from '@/lib/messages';
-import { supabase } from '../../supabaseClient';
+import { supabase } from '../supabaseClient';
 
 function formatMessageTime(iso: string): string {
   const d = new Date(iso);
@@ -119,7 +119,7 @@ export default function DmThreadScreen() {
   return (
     <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.topRow}>
-        <TouchableOpacity onPress={() => router.push('/messages')}>
+        <TouchableOpacity onPress={() => router.back()}>
           <ThemedText style={dynamicStyles.headerText}>‹ back</ThemedText>
         </TouchableOpacity>
         <ThemedText style={dynamicStyles.headerText} numberOfLines={1}>

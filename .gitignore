@@ -49,3 +49,6 @@ example
 AGENTS.md
 CLAUDE.md
 .env
+
+# Test coverage output
+coverage/

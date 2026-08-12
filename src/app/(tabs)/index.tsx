@@ -343,6 +343,7 @@ export default function HomeScreen() {
             selected={followingOnly}
             selectedColor={colors.accentGreen}
             onPress={() => setFollowingOnly((v) => !v)}
+            style={styles.followingChip}
           />
         </View>
 
@@ -504,6 +505,7 @@ const styles = StyleSheet.create({
   createShadow: { marginBottom: Spacing.three },
   createBtn: { paddingVertical: Spacing.two, alignItems: 'center' },
   sortRow: { flexDirection: 'row', gap: Spacing.two, marginBottom: Spacing.three },
+  followingChip: { marginLeft: 'auto' },
   noteText: { fontSize: 13, fontWeight: '600', marginBottom: Spacing.three },
   cardShadow: { marginBottom: Spacing.four },
   card: { padding: Spacing.three },

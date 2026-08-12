@@ -1,16 +1,10 @@
 import { Tabs } from 'expo-router';
 
+// Only the real tab-bar screens live here now (index, calendar, map, profile,
+// messages, implicitly registered from their files). Everything else —
+// user, connections, event-detail, dm-thread, notifications, search,
+// insights, edit-profile — is a pushed detail/modal screen and lives in the
+// root Stack (src/app/) instead, so it gets a real back-stack.
 export default function TabLayout() {
-  return (
-    <Tabs screenOptions={{ headerShown: false }}>
-      <Tabs.Screen name="edit-profile" options={{ href: null }} />
-      <Tabs.Screen name="event-detail" options={{ href: null }} />
-      <Tabs.Screen name="dm-thread" options={{ href: null }} />
-      <Tabs.Screen name="insights" options={{ href: null }} />
-      <Tabs.Screen name="search" options={{ href: null }} />
-      <Tabs.Screen name="user" options={{ href: null }} />
-      <Tabs.Screen name="connections" options={{ href: null }} />
-      <Tabs.Screen name="notifications" options={{ href: null }} />
-    </Tabs>
-  );
+  return <Tabs screenOptions={{ headerShown: false }} />;
 }

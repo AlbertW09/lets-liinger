@@ -16,5 +16,9 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
-  ]
+  ],
+  // Test files are type-checked separately by ts-jest (see tsconfig.jest.json)
+  // using Node-style module resolution, which is what Jest actually runs
+  // under — this app config targets Metro's bundler resolution instead.
+  "exclude": ["**/__tests__/**"]
 }
