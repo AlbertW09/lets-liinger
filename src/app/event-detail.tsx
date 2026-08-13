@@ -13,6 +13,7 @@ import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { getFollowingIds } from '../lib/follows';
+import { checkClean } from '../lib/profanity';
 import { supabase } from '../supabaseClient';
 
 interface Comment {
@@ -59,6 +60,7 @@ export default function EventDetailScreen() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [posting, setPosting] = useState(false);
+  const [commentError, setCommentError] = useState('');
 
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -175,6 +177,12 @@ export default function EventDetailScreen() {
 
   async function postComment() {
     if (!newComment.trim() || !userId || !id) return;
+    const badWord = checkClean(newComment);
+    if (badWord) {
+      setCommentError(badWord);
+      return;
+    }
+    setCommentError('');
     setPosting(true);
     const { error } = await supabase
       .from('event_comments')
@@ -412,6 +420,10 @@ export default function EventDetailScreen() {
           </TouchableOpacity>
         </View>
 
+        {commentError ? (
+          <ThemedText style={styles.commentError}>{commentError}</ThemedText>
+        ) : null}
+
         {comments.length === 0 ? (
           <ThemedText style={styles.noteText} themeColor="textSecondary">No comments yet. Start the conversation!</ThemedText>
         ) : (
@@ -527,6 +539,7 @@ const styles = StyleSheet.create({
   friendsGoing: { fontSize: 13, fontWeight: '900', marginTop: Spacing.two },
   actionsRow: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.three },
   buttonText: { fontWeight: '900', color: '#000', fontSize: 14 },
+  commentError: { color: '#ff6b6b', fontWeight: '700', fontSize: 12, marginBottom: Spacing.two },
   sectionTitle: { fontWeight: '900', fontSize: 16, letterSpacing: 0.5, marginTop: Spacing.two, marginBottom: Spacing.two },
   noteText: { fontSize: 13, fontWeight: '600', marginBottom: Spacing.three },
   rsvpWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, marginBottom: Spacing.three },

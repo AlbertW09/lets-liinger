@@ -37,10 +37,22 @@ export function DateTimeField({ mode, value, onChange, colors }: DateTimeFieldPr
     onChange(next);
   }
 
+  // Pop the native calendar/clock as soon as the field is focused or clicked,
+  // instead of only when the small icon is tapped.
+  function openPicker(event: any) {
+    try {
+      event.target?.showPicker?.();
+    } catch {
+      // showPicker throws if not user-activated in some browsers — ignore.
+    }
+  }
+
   return createElement('input', {
     type: mode,
     value: toInputValue(mode, value),
     onChange: handleChange,
+    onFocus: openPicker,
+    onClick: openPicker,
     style: {
       backgroundColor: colors.backgroundElement,
       color: colors.text,

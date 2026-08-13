@@ -3,8 +3,6 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -14,10 +12,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Badge } from '@/components/ui/badge';
+import { Chip } from '@/components/ui/chip';
 import { IconButton } from '@/components/ui/icon-button';
 import { ShadowSurface } from '@/components/ui/shadow-surface';
+import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
+import { useClubs } from '@/hooks/use-clubs';
 import { useTheme } from '@/hooks/use-theme';
+import { clubLabel } from '@/lib/clubs';
 import { getFollowCounts } from '../../lib/follows';
 import { supabase } from '../../supabaseClient';
 
@@ -40,14 +42,38 @@ export default function ProfileScreen() {
     host: string;
     location: string;
   }[]>([]);
-  const [menuVisible, setMenuVisible] = useState(false);
   const [selfId, setSelfId] = useState<string | null>(null);
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
+  const { clubs, create: createClub } = useClubs();
+  const [addingClub, setAddingClub] = useState(false);
+  const [newClubName, setNewClubName] = useState('');
+  const [newClubRole, setNewClubRole] = useState('');
 
-  async function handleLogOut() {
-    setMenuVisible(false);
-    await supabase.auth.signOut();
-    // Root layout listens for the auth-state change and redirects to /auth
+  async function saveClubs(next: { name: string; role: string }[]) {
+    if (!selfId) return;
+    setProfile((p) => (p ? { ...p, extracurriculars: next } : p));
+    await supabase.from('profiles').update({ extracurriculars: next }).eq('id', selfId);
+  }
+
+  function removeClub(index: number) {
+    saveClubs((profile?.extracurriculars ?? []).filter((_, i) => i !== index));
+  }
+
+  async function addClubToProfile(name: string, role: string) {
+    const clean = name.trim();
+    if (!clean) return;
+    const existing = profile?.extracurriculars ?? [];
+    if (existing.some((c) => c.name.toLowerCase() === clean.toLowerCase())) {
+      setAddingClub(false);
+      setNewClubName('');
+      setNewClubRole('');
+      return;
+    }
+    await saveClubs([...existing, { name: clean, role: role.trim() || 'Member' }]);
+    createClub(clean, ''); // remember it as a suggestion for events + others
+    setNewClubName('');
+    setNewClubRole('');
+    setAddingClub(false);
   }
 
   useFocusEffect(
@@ -146,24 +172,9 @@ export default function ProfileScreen() {
           <ThemedText style={dynamicStyles.headerText}>my profile</ThemedText>
           <View style={styles.headerActions}>
             <IconButton emoji="🔎" onPress={() => router.push('/search')} />
-            <IconButton emoji="⚙️" onPress={() => setMenuVisible(true)} />
+            <IconButton emoji="⚙️" onPress={() => router.push('/settings')} />
           </View>
         </View>
-
-        <Modal
-          visible={menuVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setMenuVisible(false)}
-        >
-          <Pressable style={styles.menuBackdrop} onPress={() => setMenuVisible(false)}>
-            <ShadowSurface backgroundColor={colors.backgroundElement} radius={16} offset={4} wrapperStyle={styles.menuShadow} style={styles.menu}>
-              <TouchableOpacity style={styles.menuItem} onPress={handleLogOut}>
-                <ThemedText style={styles.menuItemText}>🚪 Log Out</ThemedText>
-              </TouchableOpacity>
-            </ShadowSurface>
-          </Pressable>
-        </Modal>
 
         <ShadowSurface backgroundColor={colors.backgroundElement} radius={24} offset={6} wrapperStyle={styles.profileCardShadow} style={styles.profileCard}>
           <View style={dynamicStyles.avatarContainer}>
@@ -177,6 +188,24 @@ export default function ProfileScreen() {
           </ThemedText>
 
           <Badge label={`@${profile?.username || 'username'}`} backgroundColor={colors.accentCyan} radius={12} style={styles.handleBadge} />
+
+          <View style={styles.followRow}>
+            <TouchableOpacity
+              style={styles.followStat}
+              onPress={() => selfId && router.push(`/connections?userId=${selfId}&type=followers`)}
+            >
+              <ThemedText style={styles.followNum}>{followCounts.followers}</ThemedText>
+              <ThemedText style={styles.followLabel} themeColor="textSecondary">Followers</ThemedText>
+            </TouchableOpacity>
+            <View style={[styles.followDivider, { backgroundColor: colors.border }]} />
+            <TouchableOpacity
+              style={styles.followStat}
+              onPress={() => selfId && router.push(`/connections?userId=${selfId}&type=following`)}
+            >
+              <ThemedText style={styles.followNum}>{followCounts.following}</ThemedText>
+              <ThemedText style={styles.followLabel} themeColor="textSecondary">Following</ThemedText>
+            </TouchableOpacity>
+          </View>
 
           <ThemedText style={styles.bioText}>
             {profile?.bio || 'No bio yet.'}
@@ -205,26 +234,6 @@ export default function ProfileScreen() {
         </ShadowSurface>
 
         <View style={styles.statsRow}>
-          <ShadowSurface
-            backgroundColor={colors.backgroundElement} radius={16} offset={4}
-            wrapperStyle={styles.statBoxShadow} style={styles.statBox}
-            onPress={() => selfId && router.push(`/connections?userId=${selfId}&type=followers`)}
-          >
-            <ThemedText style={styles.statNumber}>{followCounts.followers}</ThemedText>
-            <ThemedText style={styles.statLabel}>FOLLOWERS</ThemedText>
-          </ShadowSurface>
-
-          <ShadowSurface
-            backgroundColor={colors.backgroundElement} radius={16} offset={4}
-            wrapperStyle={styles.statBoxShadow} style={styles.statBox}
-            onPress={() => selfId && router.push(`/connections?userId=${selfId}&type=following`)}
-          >
-            <ThemedText style={styles.statNumber}>{followCounts.following}</ThemedText>
-            <ThemedText style={styles.statLabel}>FOLLOWING</ThemedText>
-          </ShadowSurface>
-        </View>
-
-        <View style={styles.statsRow}>
           <ShadowSurface backgroundColor={colors.backgroundElement} radius={16} offset={4} wrapperStyle={styles.statBoxShadow} style={styles.statBox}>
             <ThemedText style={styles.statNumber}>{savedEvents.length}</ThemedText>
             <ThemedText style={styles.statLabel}>RSVPS</ThemedText>
@@ -247,13 +256,35 @@ export default function ProfileScreen() {
           <ThemedText style={styles.insightsBtnText}>📊 MY EVENT INSIGHTS</ThemedText>
         </ShadowSurface>
 
-        <View style={styles.sectionHeader}>
+        <View style={styles.clubsHeader}>
           <ThemedText style={styles.sectionTitle}>🏷️ MY CLUBS</ThemedText>
+          <TouchableOpacity onPress={() => setAddingClub((v) => !v)}>
+            <ThemedText style={[styles.addClubLink, { color: colors.accentCyan }]}>
+              {addingClub ? 'Close' : '＋ Add'}
+            </ThemedText>
+          </TouchableOpacity>
         </View>
 
-        {!profile?.extracurriculars?.length && (
+        {addingClub && (
+          <ShadowSurface backgroundColor={colors.backgroundElement} radius={14} offset={3} borderWidth={2} wrapperStyle={styles.addClubShadow} style={styles.addClubCard}>
+            {clubs.length > 0 && (
+              <View style={styles.suggestWrap}>
+                {clubs.map((c) => (
+                  <Chip key={c.id} label={clubLabel(c)} selected={newClubName === c.name} onPress={() => setNewClubName(c.name)} />
+                ))}
+              </View>
+            )}
+            <TextField placeholder="Club or org name" value={newClubName} onChangeText={setNewClubName} containerStyle={styles.addClubField} />
+            <TextField placeholder="Your role (e.g. Member)" value={newClubRole} onChangeText={setNewClubRole} containerStyle={styles.addClubField} />
+            <ShadowSurface backgroundColor={colors.accentGreen} radius={12} offset={3} wrapperStyle={styles.addClubBtnShadow} style={styles.addClubBtn} onPress={() => addClubToProfile(newClubName, newClubRole)}>
+              <ThemedText style={styles.addClubBtnText}>Add to my clubs</ThemedText>
+            </ShadowSurface>
+          </ShadowSurface>
+        )}
+
+        {!profile?.extracurriculars?.length && !addingClub && (
           <ThemedText style={styles.emptyText} themeColor="textSecondary">
-            No extracurriculars added yet. Add some from Edit Profile.
+            No clubs yet. Tap ＋ Add to join one.
           </ThemedText>
         )}
 
@@ -266,9 +297,14 @@ export default function ProfileScreen() {
             wrapperStyle={styles.clubTagShadow}
             style={styles.clubTag}
           >
-            <ThemedText style={styles.clubNameText}>{club.name}</ThemedText>
-            <View style={[styles.roleBadge, { borderColor: colors.border }]}>
-              <ThemedText style={styles.roleText}>{club.role}</ThemedText>
+            <ThemedText style={styles.clubNameText} numberOfLines={1}>{club.name}</ThemedText>
+            <View style={styles.clubRight}>
+              <View style={[styles.roleBadge, { borderColor: colors.border }]}>
+                <ThemedText style={styles.roleText}>{club.role}</ThemedText>
+              </View>
+              <TouchableOpacity onPress={() => removeClub(index)} hitSlop={8}>
+                <ThemedText style={styles.removeClubText}>✕</ThemedText>
+              </TouchableOpacity>
             </View>
           </ShadowSurface>
         ))}
@@ -328,7 +364,12 @@ const styles = StyleSheet.create({
   },
   profileCardShadow: { marginBottom: Spacing.four },
   profileCard: { padding: Spacing.four, alignItems: 'center' },
-  handleBadge: { marginTop: Spacing.one, marginBottom: Spacing.two },
+  handleBadge: { marginTop: Spacing.one, marginBottom: Spacing.two, alignSelf: 'center' },
+  followRow: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.two },
+  followStat: { alignItems: 'center', paddingHorizontal: Spacing.four },
+  followDivider: { width: 2, height: 28, opacity: 0.5 },
+  followNum: { fontSize: 18, fontWeight: '900' },
+  followLabel: { fontSize: 11, fontWeight: '700' },
   userName: {
     fontSize: 22,
     fontWeight: '900',
@@ -399,6 +440,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: Spacing.two,
   },
+  clubsHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginTop: Spacing.two, marginBottom: Spacing.two,
+  },
+  addClubLink: { fontSize: 14, fontWeight: '900' },
+  addClubShadow: { marginBottom: Spacing.three },
+  addClubCard: { padding: Spacing.three },
+  suggestWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, marginBottom: Spacing.two },
+  addClubField: { marginBottom: Spacing.two },
+  addClubBtnShadow: { marginTop: Spacing.one },
+  addClubBtn: { paddingVertical: Spacing.two, alignItems: 'center' },
+  addClubBtnText: { fontWeight: '900', color: '#000', fontSize: 13 },
   clubTagShadow: { marginBottom: Spacing.two },
   clubTag: {
     flexDirection: 'row',
@@ -407,10 +460,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
   },
+  clubRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  removeClubText: { fontSize: 14, fontWeight: '900', color: '#000' },
   clubNameText: {
     fontSize: 14,
     fontWeight: '900',
     color: '#000',
+    flex: 1,
+    marginRight: Spacing.two,
   },
   roleBadge: {
     backgroundColor: '#FFF',
