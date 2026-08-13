@@ -11,8 +11,7 @@ import { Image } from 'react-native';
 // because <Tabs.Screen> declaration order is what controls left-to-right
 // tab order — leaving any out lets expo-router register them automatically
 // in file order instead, ahead of the declared ones.
-const MESSAGES_ICON_SIZE = 30;
-const MESSAGES_ICON_SIZE_FOCUSED = 70;
+const TAB_ICON_SIZE = 28;
 
 // Only the real tab-bar screens live here now (index, calendar, map, profile,
 // messages, implicitly registered from their files). Everything else —
@@ -23,25 +22,60 @@ const MESSAGES_ICON_SIZE_FOCUSED = 70;
 export default function TabLayout() {
   return (
     <Tabs screenOptions={{ headerShown: false }}>
-      <Tabs.Screen name="index" />
-      <Tabs.Screen name="calendar" />
-      <Tabs.Screen name="map" />
-      <Tabs.Screen name="profile" />
+      <Tabs.Screen
+        name="index"
+        options={{
+          tabBarLabel: 'home',
+          tabBarIcon: () => (
+            <Image
+              source={require('@/assets/images/tabIcons/home.png')}
+              style={{ width: TAB_ICON_SIZE, height: TAB_ICON_SIZE }}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="calendar"
+        options={{
+          tabBarIcon: () => (
+            <Image
+              source={require('@/assets/images/tabIcons/calendar.png')}
+              style={{ width: TAB_ICON_SIZE, height: TAB_ICON_SIZE }}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="map"
+        options={{
+          tabBarIcon: () => (
+            <Image
+              source={require('@/assets/images/tabIcons/map.png')}
+              style={{ width: TAB_ICON_SIZE, height: TAB_ICON_SIZE }}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          tabBarIcon: () => (
+            <Image
+              source={require('@/assets/images/tabIcons/profile.png')}
+              style={{ width: TAB_ICON_SIZE, height: TAB_ICON_SIZE }}
+            />
+          ),
+        }}
+      />
       <Tabs.Screen
         name="messages"
         options={{
-          tabBarShowLabel: false,
-          // Custom icon is already full-color, so no tintColor here (that
-          // would flatten it to a solid color instead of showing it as-is).
-          tabBarIcon: ({ focused }) => {
-            const size = focused ? MESSAGES_ICON_SIZE_FOCUSED : MESSAGES_ICON_SIZE;
-            return (
-              <Image
-                source={require('@/assets/images/tabIcons/messages.png')}
-                style={{ width: size, height: size }}
-              />
-            );
-          },
+          tabBarIcon: () => (
+            <Image
+              source={require('@/assets/images/tabIcons/messages.png')}
+              style={{ width: TAB_ICON_SIZE, height: TAB_ICON_SIZE }}
+            />
+          ),
         }}
       />
     </Tabs>

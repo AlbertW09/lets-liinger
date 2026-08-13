@@ -17,15 +17,15 @@ export const Colors = {
   },
   dark: {
     text: '#FFFFFF',
-    background: '#0D0D0D',
-    backgroundElement: '#1A1A1A',
+    background: '#1A1A1A',
+    backgroundElement: '#2d2d2d',
     backgroundSelected: '#39FF14',
     textSecondary: '#A0A0A0',
     accentGreen: '#39FF14',
     accentPink: '#FF007F',
     accentCyan: '#00F0FF',
     accentYellow: '#FFC72C',
-    border: '#FFFFFF',
+    border: '#d9d9d9',
   },
 } as const;
 
