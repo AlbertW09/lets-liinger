@@ -4,6 +4,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { NotificationsProvider } from '@/hooks/notifications-context';
 import { supabase } from '../supabaseClient';
 
 SplashScreen.preventAutoHideAsync();
@@ -56,9 +57,9 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <NotificationsProvider>
       <StatusBar style="auto" />
       <Stack screenOptions={{ headerShown: false }} />
-    </>
+    </NotificationsProvider>
   );
 }

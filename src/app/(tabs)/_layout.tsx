@@ -1,25 +1,37 @@
 import { Tabs } from 'expo-router';
-import { Image } from 'react-native';
+import { Image, View, StyleSheet } from 'react-native';
+
+import { useNotifications } from '@/hooks/notifications-context';
+import { useTheme } from '@/hooks/use-theme';
 
 // Only the real tab-bar screens live here now (index, calendar, map, profile,
-// messages, implicitly registered from their files). Everything else —
-// user, connections, event-detail, dm-thread, notifications, search,
-// insights, edit-profile — is a pushed detail/modal screen and lives in the
-// root Stack (src/app/) instead, so it gets a real back-stack.
+// messages). Everything else — user, connections, event-detail, dm-thread,
+// notifications, search, insights, edit-profile, settings, legal, moderation —
+// is a pushed detail/modal screen and lives in the root Stack (src/app/), so it
+// gets a real back-stack.
 //
 // All five are declared explicitly (even the ones with no custom options)
-// because <Tabs.Screen> declaration order is what controls left-to-right
-// tab order — leaving any out lets expo-router register them automatically
-// in file order instead, ahead of the declared ones.
+// because <Tabs.Screen> declaration order is what controls left-to-right tab
+// order — leaving any out lets expo-router register them automatically in file
+// order instead, ahead of the declared ones.
 const TAB_ICON_SIZE = 28;
 
-// Only the real tab-bar screens live here now (index, calendar, map, profile,
-// messages, implicitly registered from their files). Everything else —
-// user, connections, event-detail, dm-thread, notifications, search,
-// insights, edit-profile, settings, legal, moderation — is a pushed
-// detail/modal screen and lives in the root Stack (src/app/) instead, so it
-// gets a real back-stack.
+// A tab icon that can show a small unread "dot" in its top-right corner.
+function TabIcon({ source, showDot }: { source: any; showDot?: boolean }) {
+  const colors = useTheme();
+  return (
+    <View>
+      <Image source={source} style={{ width: TAB_ICON_SIZE, height: TAB_ICON_SIZE }} />
+      {showDot ? (
+        <View style={[styles.dot, { backgroundColor: colors.accentPink, borderColor: colors.background }]} />
+      ) : null}
+    </View>
+  );
+}
+
 export default function TabLayout() {
+  const { hasUnreadMessages, hasNewEvents } = useNotifications();
+
   return (
     <Tabs screenOptions={{ headerShown: false }}>
       <Tabs.Screen
@@ -27,10 +39,7 @@ export default function TabLayout() {
         options={{
           tabBarLabel: 'home',
           tabBarIcon: () => (
-            <Image
-              source={require('@/assets/images/tabIcons/home.png')}
-              style={{ width: TAB_ICON_SIZE, height: TAB_ICON_SIZE }}
-            />
+            <TabIcon source={require('@/assets/images/tabIcons/home.png')} showDot={hasNewEvents} />
           ),
         }}
       />
@@ -38,10 +47,7 @@ export default function TabLayout() {
         name="calendar"
         options={{
           tabBarIcon: () => (
-            <Image
-              source={require('@/assets/images/tabIcons/calendar.png')}
-              style={{ width: TAB_ICON_SIZE, height: TAB_ICON_SIZE }}
-            />
+            <TabIcon source={require('@/assets/images/tabIcons/calendar.png')} />
           ),
         }}
       />
@@ -49,10 +55,7 @@ export default function TabLayout() {
         name="map"
         options={{
           tabBarIcon: () => (
-            <Image
-              source={require('@/assets/images/tabIcons/map.png')}
-              style={{ width: TAB_ICON_SIZE, height: TAB_ICON_SIZE }}
-            />
+            <TabIcon source={require('@/assets/images/tabIcons/map.png')} />
           ),
         }}
       />
@@ -60,10 +63,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           tabBarIcon: () => (
-            <Image
-              source={require('@/assets/images/tabIcons/profile.png')}
-              style={{ width: TAB_ICON_SIZE, height: TAB_ICON_SIZE }}
-            />
+            <TabIcon source={require('@/assets/images/tabIcons/profile.png')} />
           ),
         }}
       />
@@ -71,13 +71,22 @@ export default function TabLayout() {
         name="messages"
         options={{
           tabBarIcon: () => (
-            <Image
-              source={require('@/assets/images/tabIcons/messages.png')}
-              style={{ width: TAB_ICON_SIZE, height: TAB_ICON_SIZE }}
-            />
+            <TabIcon source={require('@/assets/images/tabIcons/messages.png')} showDot={hasUnreadMessages} />
           ),
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  dot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+  },
+});

@@ -8,6 +8,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
+import { useNotifications } from '@/hooks/notifications-context';
 import { useTheme } from '@/hooks/use-theme';
 import {
   ConversationSummary, ProfileLite, fetchConversations, profileLabel, searchProfilesByUsername, subscribeToMyMessages,
@@ -33,6 +34,7 @@ function formatRelative(iso: string): string {
 export default function MessagesScreen() {
   const colors = useTheme();
   const router = useRouter();
+  const { markMessagesSeen } = useNotifications();
 
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
@@ -57,6 +59,7 @@ export default function MessagesScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchAll();
+      markMessagesSeen(); // opening the inbox clears the unread dot
       if (!userId) return;
       return subscribeToMyMessages(userId, () => fetchAll());
       // fetchAll intentionally omitted: userId is only known after the first

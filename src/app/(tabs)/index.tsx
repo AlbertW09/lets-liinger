@@ -16,6 +16,7 @@ import { Chip } from '@/components/ui/chip';
 import { IconButton } from '@/components/ui/icon-button';
 import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { Spacing } from '@/constants/theme';
+import { useNotifications } from '@/hooks/notifications-context';
 import { useTheme } from '@/hooks/use-theme';
 import { getFollowingIds, getUnreadFollowerCount } from '../../lib/follows';
 import { getBlockedIds } from '../../lib/moderation';
@@ -113,6 +114,7 @@ function getCurrentCoords(): Promise<Coords | null> {
 export default function HomeScreen() {
   const colors = useTheme();
   const router = useRouter();
+  const { markEventsSeen } = useNotifications();
 
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<EnrichedEvent[]>([]);
@@ -220,7 +222,8 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchAll();
-    }, [fetchAll])
+      markEventsSeen(); // viewing the home feed clears the new-events dot
+    }, [fetchAll, markEventsSeen])
   );
 
   function loadMore() {

@@ -6,7 +6,9 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -16,28 +18,52 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { deleteAccount } from '../lib/account';
 import { isModerator } from '../lib/moderation';
+import { disablePush, enablePush, getPushEnabled } from '../lib/push';
 import { supabase } from '../supabaseClient';
 
 export default function SettingsScreen() {
   const colors = useTheme();
   const router = useRouter();
 
+  const [selfId, setSelfId] = useState<string | null>(null);
   const [moderator, setModerator] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushNote, setPushNote] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user && !cancelled) {
-        const mod = await isModerator(user.id);
-        if (!cancelled) setModerator(mod);
+        setSelfId(user.id);
+        const [mod, push] = await Promise.all([isModerator(user.id), getPushEnabled(user.id)]);
+        if (!cancelled) {
+          setModerator(mod);
+          setPushEnabled(push);
+        }
       }
     })();
     return () => { cancelled = true; };
   }, []);
+
+  async function handleTogglePush(next: boolean) {
+    if (!selfId || pushBusy) return;
+    setPushNote('');
+    setPushBusy(true);
+    const { error } = next ? await enablePush(selfId) : await disablePush(selfId);
+    setPushBusy(false);
+    if (error) {
+      setPushEnabled(false);
+      setPushNote(error);
+      return;
+    }
+    setPushEnabled(next);
+  }
 
   async function handleLogOut() {
     await supabase.auth.signOut();
@@ -90,6 +116,29 @@ export default function SettingsScreen() {
             <ThemedText style={styles.chevron} themeColor="textSecondary">›</ThemedText>
           </TouchableOpacity>
         </ShadowSurface>
+
+        {/* Notifications */}
+        <ThemedText style={styles.sectionTitle}>NOTIFICATIONS</ThemedText>
+        <ShadowSurface backgroundColor={colors.backgroundElement} radius={16} offset={4} borderWidth={2} wrapperStyle={styles.cardShadow} style={styles.card}>
+          <View style={[dynamicStyles.row, styles.lastRow]}>
+            <ThemedText style={styles.rowLabel}>📲  Push to my phone</ThemedText>
+            {pushBusy ? (
+              <ActivityIndicator color={colors.text} />
+            ) : (
+              <Switch
+                value={pushEnabled}
+                onValueChange={handleTogglePush}
+                trackColor={{ true: colors.accentGreen, false: colors.border }}
+                thumbColor="#fff"
+              />
+            )}
+          </View>
+        </ShadowSurface>
+        <ThemedText style={styles.hint} themeColor="textSecondary">
+          {pushNote
+            ? pushNote
+            : 'Get a notification when someone messages you or a new event is posted. Works in the installed iOS/Android app.'}
+        </ThemedText>
 
         {/* Legal */}
         <ThemedText style={styles.sectionTitle}>LEGAL</ThemedText>
@@ -185,6 +234,7 @@ const styles = StyleSheet.create({
   deleteBtn: { paddingVertical: Spacing.three, alignItems: 'center' },
   deleteBtnText: { fontWeight: '900', color: '#000', fontSize: 14, letterSpacing: 0.5 },
   dangerHint: { fontSize: 12, fontWeight: '600', marginTop: Spacing.two, lineHeight: 17 },
+  hint: { fontSize: 12, fontWeight: '600', marginTop: Spacing.one, lineHeight: 17 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: Spacing.four },
   confirmShadow: {},
   confirmCard: { padding: Spacing.four },

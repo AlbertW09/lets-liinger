@@ -7,9 +7,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import {
-  FollowNotification, followUser, getFollowerNotifications, markNotificationsSeen, unfollowUser,
-} from '../lib/follows';
+import { followUser, markNotificationsSeen, unfollowUser } from '../lib/follows';
+import { getAllNotifications, type NotificationItem } from '../lib/notifications';
 import { supabase } from '../supabaseClient';
 
 function relative(iso: string): string {
@@ -31,7 +30,7 @@ export default function NotificationsScreen() {
 
   const [loading, setLoading] = useState(true);
   const [selfId, setSelfId] = useState<string | null>(null);
-  const [items, setItems] = useState<FollowNotification[]>([]);
+  const [items, setItems] = useState<NotificationItem[]>([]);
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
 
   useFocusEffect(
@@ -42,12 +41,21 @@ export default function NotificationsScreen() {
         if (cancelled) return;
         if (!user) { setLoading(false); return; }
         setSelfId(user.id);
-        const list = await getFollowerNotifications(user.id);
+        const list = await getAllNotifications(user.id);
         if (cancelled) return;
         setItems(list);
-        setFollowingIds(new Set(list.filter((i) => i.followsBack).map((i) => i.profile.id)));
+        setFollowingIds(
+          new Set(
+            list
+              .filter(
+                (i): i is Extract<NotificationItem, { kind: 'follow' }> =>
+                  i.kind === 'follow' && i.followsBack
+              )
+              .map((i) => i.profile.id)
+          )
+        );
         setLoading(false);
-        markNotificationsSeen(user.id); // clear the unread badge
+        markNotificationsSeen(user.id); // clear the unread follower badge
       })();
       return () => { cancelled = true; };
     }, [])
@@ -67,6 +75,96 @@ export default function NotificationsScreen() {
     }
   }
 
+  function avatarFor(profile: { avatar_url: string | null } | null, name: string, bg: string) {
+    return (
+      <View style={[styles.avatar, { borderColor: colors.border, backgroundColor: bg }]}>
+        {profile?.avatar_url ? (
+          <Image source={{ uri: profile.avatar_url }} style={styles.avatarImg} resizeMode="cover" />
+        ) : (
+          <ThemedText style={styles.avatarInitial}>{name.charAt(0).toUpperCase()}</ThemedText>
+        )}
+      </View>
+    );
+  }
+
+  function renderItem(it: NotificationItem) {
+    if (it.kind === 'follow') {
+      const name = it.profile.display_name || it.profile.username || 'Someone';
+      const following = followingIds.has(it.profile.id);
+      return (
+        <ShadowSurface
+          key={it.key}
+          backgroundColor={colors.backgroundElement}
+          radius={14} offset={3} borderWidth={2}
+          wrapperStyle={styles.rowWrap} style={styles.row}
+          onPress={() => router.push(`/user?id=${it.profile.id}`)}
+        >
+          {avatarFor(it.profile, name, colors.accentYellow)}
+          <View style={styles.info}>
+            <ThemedText style={styles.text} numberOfLines={2}>
+              <ThemedText style={styles.bold}>@{it.profile.username || 'user'}</ThemedText> started following you
+            </ThemedText>
+            <ThemedText style={styles.time} themeColor="textSecondary">{relative(it.createdAt)}</ThemedText>
+          </View>
+          <ShadowSurface
+            backgroundColor={following ? colors.backgroundElement : colors.accentPink}
+            radius={10} offset={2} borderWidth={2}
+            onPress={() => toggleFollow(it.profile.id)} style={styles.followBtn}
+          >
+            <ThemedText style={[styles.followText, { color: following ? colors.text : '#000' }]}>
+              {following ? 'Following' : 'Follow back'}
+            </ThemedText>
+          </ShadowSurface>
+        </ShadowSurface>
+      );
+    }
+
+    if (it.kind === 'message') {
+      const name = it.profile.display_name || it.profile.username || 'Someone';
+      return (
+        <ShadowSurface
+          key={it.key}
+          backgroundColor={colors.backgroundElement}
+          radius={14} offset={3} borderWidth={2}
+          wrapperStyle={styles.rowWrap} style={styles.row}
+          onPress={() => router.push(`/dm-thread?userId=${it.profile.id}`)}
+        >
+          {avatarFor(it.profile, name, colors.accentCyan)}
+          <View style={styles.info}>
+            <ThemedText style={styles.text} numberOfLines={2}>
+              <ThemedText style={styles.bold}>@{it.profile.username || 'user'}</ThemedText> sent you a message
+            </ThemedText>
+            <ThemedText style={styles.preview} themeColor="textSecondary" numberOfLines={1}>{it.preview}</ThemedText>
+            <ThemedText style={styles.time} themeColor="textSecondary">{relative(it.createdAt)}</ThemedText>
+          </View>
+          <ThemedText style={styles.emojiTag}>💬</ThemedText>
+        </ShadowSurface>
+      );
+    }
+
+    // event
+    const name = it.profile?.display_name || it.profile?.username || 'Someone';
+    return (
+      <ShadowSurface
+        key={it.key}
+        backgroundColor={colors.backgroundElement}
+        radius={14} offset={3} borderWidth={2}
+        wrapperStyle={styles.rowWrap} style={styles.row}
+        onPress={() => router.push(`/event-detail?id=${it.eventId}`)}
+      >
+        {avatarFor(it.profile, name, colors.accentGreen)}
+        <View style={styles.info}>
+          <ThemedText style={styles.text} numberOfLines={2}>
+            <ThemedText style={styles.bold}>@{it.profile?.username || 'someone'}</ThemedText> posted a new event
+          </ThemedText>
+          <ThemedText style={styles.preview} themeColor="textSecondary" numberOfLines={1}>{it.title}</ThemedText>
+          <ThemedText style={styles.time} themeColor="textSecondary">{relative(it.createdAt)}</ThemedText>
+        </View>
+        <ThemedText style={styles.emojiTag}>📅</ThemedText>
+      </ShadowSurface>
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -79,45 +177,10 @@ export default function NotificationsScreen() {
           <ActivityIndicator size="large" color={colors.text} style={{ marginTop: Spacing.four }} />
         ) : items.length === 0 ? (
           <ThemedText style={styles.note} themeColor="textSecondary">
-            No notifications yet. When someone follows you, it shows up here.
+            Nothing yet. Follows, messages, and new events will show up here.
           </ThemedText>
         ) : (
-          items.map((it) => {
-            const name = it.profile.display_name || it.profile.username || 'Someone';
-            const following = followingIds.has(it.profile.id);
-            return (
-              <ShadowSurface
-                key={it.profile.id}
-                backgroundColor={colors.backgroundElement}
-                radius={14} offset={3} borderWidth={2}
-                wrapperStyle={styles.rowWrap} style={styles.row}
-                onPress={() => router.push(`/user?id=${it.profile.id}`)}
-              >
-                <View style={[styles.avatar, { borderColor: colors.border, backgroundColor: colors.accentYellow }]}>
-                  {it.profile.avatar_url ? (
-                    <Image source={{ uri: it.profile.avatar_url }} style={styles.avatarImg} resizeMode="cover" />
-                  ) : (
-                    <ThemedText style={styles.avatarInitial}>{name.charAt(0).toUpperCase()}</ThemedText>
-                  )}
-                </View>
-                <View style={styles.info}>
-                  <ThemedText style={styles.text} numberOfLines={2}>
-                    <ThemedText style={styles.bold}>@{it.profile.username || 'user'}</ThemedText> started following you
-                  </ThemedText>
-                  <ThemedText style={styles.time} themeColor="textSecondary">{relative(it.createdAt)}</ThemedText>
-                </View>
-                <ShadowSurface
-                  backgroundColor={following ? colors.backgroundElement : colors.accentPink}
-                  radius={10} offset={2} borderWidth={2}
-                  onPress={() => toggleFollow(it.profile.id)} style={styles.followBtn}
-                >
-                  <ThemedText style={[styles.followText, { color: following ? colors.text : '#000' }]}>
-                    {following ? 'Following' : 'Follow back'}
-                  </ThemedText>
-                </ShadowSurface>
-              </ShadowSurface>
-            );
-          })
+          items.map(renderItem)
         )}
       </ScrollView>
     </SafeAreaView>
@@ -139,7 +202,9 @@ const styles = StyleSheet.create({
   info: { flex: 1 },
   text: { fontSize: 13, fontWeight: '600' },
   bold: { fontSize: 13, fontWeight: '900' },
+  preview: { fontSize: 12, fontWeight: '600', marginTop: 1 },
   time: { fontSize: 11, fontWeight: '700', marginTop: 2 },
   followBtn: { paddingHorizontal: Spacing.two, paddingVertical: Spacing.one },
   followText: { fontWeight: '900', fontSize: 11 },
+  emojiTag: { fontSize: 18, paddingHorizontal: Spacing.one },
 });
