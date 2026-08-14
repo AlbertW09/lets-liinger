@@ -11,6 +11,7 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useClubs } from '@/hooks/use-clubs';
 import { usePlaceSearch } from '@/hooks/use-place-search';
+import { useUserCoords } from '@/hooks/use-user-coords';
 import { useTheme } from '@/hooks/use-theme';
 import { clubLabel } from '@/lib/clubs';
 import { PlaceResult } from '@/lib/places';
@@ -77,7 +78,8 @@ function toEventTimeIso(date: Date, time: Date | null): string {
 export function EventFormModal({ visible, mode, initialValues, onClose, onSubmit, onSuccess }: EventFormModalProps) {
   const theme = useTheme();
   const { clubs, create: createClub } = useClubs();
-  const place = usePlaceSearch(null);
+  const userCoords = useUserCoords();
+  const place = usePlaceSearch(null, userCoords);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');

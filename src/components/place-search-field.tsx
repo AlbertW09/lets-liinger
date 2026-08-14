@@ -41,6 +41,11 @@ export function PlaceSearchField({ search }: PlaceSearchFieldProps) {
               onPress={() => pick(p)}
             >
               <ThemedText style={styles.rowText}>📍 {p.name}</ThemedText>
+              {p.subtitle ? (
+                <ThemedText style={styles.rowSub} themeColor="textSecondary" numberOfLines={1}>
+                  {p.subtitle}
+                </ThemedText>
+              ) : null}
             </TouchableOpacity>
           ))}
         </View>
@@ -54,4 +59,5 @@ const styles = StyleSheet.create({
   list: { borderWidth: 2, borderRadius: 12, marginTop: Spacing.two, overflow: 'hidden' },
   row: { paddingVertical: Spacing.two, paddingHorizontal: Spacing.three },
   rowText: { fontSize: 14, fontWeight: '700' },
+  rowSub: { fontSize: 12, fontWeight: '600', marginTop: 1 },
 });

@@ -14,11 +14,11 @@ describe('searchPlaces', () => {
     expect(await searchPlaces('library')).toEqual([]);
   });
 
-  it('queries Nominatim and maps name/city, lat, and lng', async () => {
+  it('queries Nominatim and maps name, city subtitle, lat, and lng', async () => {
     const mockJson = jest.fn().mockResolvedValue([
       {
         name: 'Central Library',
-        address: { city: 'Santa Cruz' },
+        address: { city: 'Santa Cruz', state: 'California' },
         lat: '36.9741',
         lon: '-122.0308',
         display_name: 'Central Library, Santa Cruz, CA',
@@ -32,8 +32,10 @@ describe('searchPlaces', () => {
       expect.stringContaining('https://nominatim.openstreetmap.org/search?'),
       expect.objectContaining({ headers: { Accept: 'application/json' } })
     );
-    expect((global.fetch as jest.Mock).mock.calls[0][0]).toContain(encodeURIComponent('central library'));
-    expect(results).toEqual([{ name: 'Central Library, Santa Cruz', lat: 36.9741, lng: -122.0308 }]);
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).toContain('q=central+library');
+    expect(results).toEqual([
+      { name: 'Central Library', subtitle: 'Santa Cruz, California', lat: 36.9741, lng: -122.0308 },
+    ]);
   });
 
   it('falls back to display_name when the place has no name', async () => {
@@ -50,7 +52,8 @@ describe('searchPlaces', () => {
 
     const results = await searchPlaces('some street');
 
-    expect(results).toEqual([{ name: 'Some Street, Some Town', lat: 1.5, lng: 2.5 }]);
+    // subtitle is undefined here (no address parts); toEqual ignores it.
+    expect(results).toEqual([{ name: 'Some Street', lat: 1.5, lng: 2.5 }]);
   });
 
   it('uses the town when there is no city', async () => {
@@ -61,7 +64,7 @@ describe('searchPlaces', () => {
 
     const results = await searchPlaces('local park');
 
-    expect(results).toEqual([{ name: 'Local Park, Smallville', lat: 0, lng: 0 }]);
+    expect(results).toEqual([{ name: 'Local Park', subtitle: 'Smallville', lat: 0, lng: 0 }]);
   });
 
   it('returns an empty array when the response body has no results', async () => {
@@ -76,8 +79,9 @@ describe('searchPlaces', () => {
     expect(await searchPlaces('anywhere')).toEqual([]);
   });
 
-  it('maps every result when the API returns multiple places', async () => {
+  it('de-duplicates identical places', async () => {
     const mockJson = jest.fn().mockResolvedValue([
+      { name: 'A', address: {}, lat: '1', lon: '1', display_name: 'A' },
       { name: 'A', address: {}, lat: '1', lon: '1', display_name: 'A' },
       { name: 'B', address: {}, lat: '2', lon: '2', display_name: 'B' },
     ]);
@@ -85,7 +89,22 @@ describe('searchPlaces', () => {
 
     const results = await searchPlaces('a or b');
 
-    expect(results).toHaveLength(2);
     expect(results.map((r) => r.name)).toEqual(['A', 'B']);
+  });
+
+  it('biases to a viewbox and sorts nearest-first when given coords', async () => {
+    const mockJson = jest.fn().mockResolvedValue([
+      { name: 'Far', address: {}, lat: '40', lon: '-118', display_name: 'Far' },
+      { name: 'Near', address: {}, lat: '37.1', lon: '-122', display_name: 'Near' },
+    ]);
+    global.fetch = jest.fn().mockResolvedValue({ json: mockJson }) as any;
+
+    const results = await searchPlaces('spot', { lat: 37, lng: -122 });
+
+    const url = (global.fetch as jest.Mock).mock.calls[0][0] as string;
+    expect(url).toContain('viewbox=');
+    expect(url).toContain('bounded=1');
+    // Nearest result comes first.
+    expect(results.map((r) => r.name)).toEqual(['Near', 'Far']);
   });
 });
