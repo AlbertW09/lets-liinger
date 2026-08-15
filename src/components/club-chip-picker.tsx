@@ -44,7 +44,7 @@ export function ClubChipPicker({ clubs, isSelected, onToggle, onClubCreated, cre
           const label = clubLabel(c);
           return <Chip key={c.id} label={label} selected={isSelected(label)} onPress={() => onToggle(label)} />;
         })}
-        <Chip label="➕ Add club" dashed onPress={() => setAdding((v) => !v)} />
+        <Chip label="Add club" dashed onPress={() => setAdding((v) => !v)} />
       </View>
       {adding && (
         <View style={styles.addRow}>

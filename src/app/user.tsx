@@ -168,7 +168,7 @@ export default function UserProfileScreen() {
 
           {mutuals.count > 0 && (
             <ThemedText style={styles.mutuals} themeColor="textSecondary">
-              👥 Followed by {mutuals.names.slice(0, 2).join(', ')}
+              Followed by {mutuals.names.slice(0, 2).join(', ')}
               {mutuals.count > 2 ? ` and ${mutuals.count - 2} others you follow` : ' you follow'}
             </ThemedText>
           )}
@@ -191,7 +191,7 @@ export default function UserProfileScreen() {
                 wrapperStyle={styles.actionFlex} style={styles.followBtn}
                 onPress={() => router.push(`/dm-thread?userId=${profile.id}`)}
               >
-                <ThemedText style={[styles.followText, { color: '#000' }]}>💬 MESSAGE</ThemedText>
+                <ThemedText style={[styles.followText, { color: '#000' }]}>MESSAGE</ThemedText>
               </ShadowSurface>
             </View>
           )}
@@ -218,7 +218,7 @@ export default function UserProfileScreen() {
 
         {!!profile.extracurriculars?.length && (
           <>
-            <ThemedText style={[styles.section, { color: colors.text }]}>🏷️ CLUBS</ThemedText>
+            <ThemedText style={[styles.section, { color: colors.text }]}>CLUBS</ThemedText>
             {profile.extracurriculars.map((club, i) => (
               <ShadowSurface
                 key={`${club.name}-${i}`}
@@ -239,11 +239,11 @@ export default function UserProfileScreen() {
         <Pressable style={styles.menuBackdrop} onPress={() => setMenuVisible(false)}>
           <ShadowSurface backgroundColor={colors.backgroundElement} radius={16} offset={4} wrapperStyle={styles.menuShadow} style={styles.menu}>
             <TouchableOpacity style={styles.menuItem} onPress={handleReport}>
-              <ThemedText style={styles.menuItemText}>🚩 Report</ThemedText>
+              <ThemedText style={styles.menuItemText}>Report</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem} onPress={handleBlock}>
               <ThemedText style={[styles.menuItemText, { color: colors.accentPink }]}>
-                {blocked ? '✓ Unblock' : '🚫 Block'}
+                {blocked ? 'Unblock' : 'Block'}
               </ThemedText>
             </TouchableOpacity>
           </ShadowSurface>

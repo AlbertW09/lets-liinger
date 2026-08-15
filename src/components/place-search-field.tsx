@@ -40,7 +40,7 @@ export function PlaceSearchField({ search }: PlaceSearchFieldProps) {
               style={[styles.row, i < results.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border }]}
               onPress={() => pick(p)}
             >
-              <ThemedText style={styles.rowText}>📍 {p.name}</ThemedText>
+              <ThemedText style={styles.rowText}>{p.name}</ThemedText>
               {p.subtitle ? (
                 <ThemedText style={styles.rowSub} themeColor="textSecondary" numberOfLines={1}>
                   {p.subtitle}

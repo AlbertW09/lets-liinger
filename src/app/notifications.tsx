@@ -137,7 +137,6 @@ export default function NotificationsScreen() {
             <ThemedText style={styles.preview} themeColor="textSecondary" numberOfLines={1}>{it.preview}</ThemedText>
             <ThemedText style={styles.time} themeColor="textSecondary">{relative(it.createdAt)}</ThemedText>
           </View>
-          <ThemedText style={styles.emojiTag}>💬</ThemedText>
         </ShadowSurface>
       );
     }
@@ -160,7 +159,6 @@ export default function NotificationsScreen() {
           <ThemedText style={styles.preview} themeColor="textSecondary" numberOfLines={1}>{it.title}</ThemedText>
           <ThemedText style={styles.time} themeColor="textSecondary">{relative(it.createdAt)}</ThemedText>
         </View>
-        <ThemedText style={styles.emojiTag}>📅</ThemedText>
       </ShadowSurface>
     );
   }
@@ -171,7 +169,7 @@ export default function NotificationsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <ThemedText style={[styles.back, { color: colors.text }]}>‹ back</ThemedText>
         </TouchableOpacity>
-        <ThemedText style={[styles.title, { color: colors.text }]}>🔔 notifications</ThemedText>
+        <ThemedText style={[styles.title, { color: colors.text }]}>notifications</ThemedText>
 
         {loading ? (
           <ActivityIndicator size="large" color={colors.text} style={{ marginTop: Spacing.four }} />

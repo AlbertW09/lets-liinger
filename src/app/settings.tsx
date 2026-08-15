@@ -108,11 +108,11 @@ export default function SettingsScreen() {
         <ThemedText style={styles.sectionTitle}>ACCOUNT</ThemedText>
         <ShadowSurface backgroundColor={colors.backgroundElement} radius={16} offset={4} borderWidth={2} wrapperStyle={styles.cardShadow} style={styles.card}>
           <TouchableOpacity style={dynamicStyles.row} onPress={() => router.push('/edit-profile')}>
-            <ThemedText style={styles.rowLabel}>✏️  Edit profile</ThemedText>
+            <ThemedText style={styles.rowLabel}>Edit profile</ThemedText>
             <ThemedText style={styles.chevron} themeColor="textSecondary">›</ThemedText>
           </TouchableOpacity>
           <TouchableOpacity style={[dynamicStyles.row, styles.lastRow]} onPress={handleLogOut}>
-            <ThemedText style={styles.rowLabel}>🚪  Log out</ThemedText>
+            <ThemedText style={styles.rowLabel}>Log out</ThemedText>
             <ThemedText style={styles.chevron} themeColor="textSecondary">›</ThemedText>
           </TouchableOpacity>
         </ShadowSurface>
@@ -121,7 +121,7 @@ export default function SettingsScreen() {
         <ThemedText style={styles.sectionTitle}>NOTIFICATIONS</ThemedText>
         <ShadowSurface backgroundColor={colors.backgroundElement} radius={16} offset={4} borderWidth={2} wrapperStyle={styles.cardShadow} style={styles.card}>
           <View style={[dynamicStyles.row, styles.lastRow]}>
-            <ThemedText style={styles.rowLabel}>📲  Push to my phone</ThemedText>
+            <ThemedText style={styles.rowLabel}>Push to my phone</ThemedText>
             {pushBusy ? (
               <ActivityIndicator color={colors.text} />
             ) : (
@@ -144,11 +144,11 @@ export default function SettingsScreen() {
         <ThemedText style={styles.sectionTitle}>LEGAL</ThemedText>
         <ShadowSurface backgroundColor={colors.backgroundElement} radius={16} offset={4} borderWidth={2} wrapperStyle={styles.cardShadow} style={styles.card}>
           <TouchableOpacity style={dynamicStyles.row} onPress={() => router.push('/legal?doc=terms')}>
-            <ThemedText style={styles.rowLabel}>📄  Terms of Service</ThemedText>
+            <ThemedText style={styles.rowLabel}>Terms of Service</ThemedText>
             <ThemedText style={styles.chevron} themeColor="textSecondary">›</ThemedText>
           </TouchableOpacity>
           <TouchableOpacity style={[dynamicStyles.row, styles.lastRow]} onPress={() => router.push('/legal?doc=privacy')}>
-            <ThemedText style={styles.rowLabel}>🔒  Privacy Policy</ThemedText>
+            <ThemedText style={styles.rowLabel}>Privacy Policy</ThemedText>
             <ThemedText style={styles.chevron} themeColor="textSecondary">›</ThemedText>
           </TouchableOpacity>
         </ShadowSurface>
@@ -159,7 +159,7 @@ export default function SettingsScreen() {
             <ThemedText style={styles.sectionTitle}>MODERATION</ThemedText>
             <ShadowSurface backgroundColor={colors.backgroundElement} radius={16} offset={4} borderWidth={2} wrapperStyle={styles.cardShadow} style={styles.card}>
               <TouchableOpacity style={[dynamicStyles.row, styles.lastRow]} onPress={() => router.push('/moderation')}>
-                <ThemedText style={styles.rowLabel}>🛡️  Review reports</ThemedText>
+                <ThemedText style={styles.rowLabel}>Review reports</ThemedText>
                 <ThemedText style={styles.chevron} themeColor="textSecondary">›</ThemedText>
               </TouchableOpacity>
             </ShadowSurface>

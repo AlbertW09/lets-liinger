@@ -336,29 +336,27 @@ export default function EventDetailScreen() {
           )}
 
           <View style={styles.detailItem}>
-            <ThemedText style={styles.detailEmoji}>📍</ThemedText>
             <ThemedText style={styles.detailText}>{event.location ?? 'TBD'}</ThemedText>
           </View>
           <View style={styles.detailItem}>
-            <ThemedText style={styles.detailEmoji}>🗓️</ThemedText>
             <ThemedText style={styles.detailText}>{formatEventTime(event.event_time)}</ThemedText>
           </View>
 
           {event.createdBy && event.createdBy !== userId ? (
             <TouchableOpacity onPress={() => router.push(`/user?id=${event.createdBy}`)}>
               <ThemedText style={styles.postedText} themeColor="textSecondary">
-                📣 Posted {formatPosted(event.created_at)} by {event.postedBy}
+                Posted {formatPosted(event.created_at)} by {event.postedBy}
               </ThemedText>
             </TouchableOpacity>
           ) : (
             <ThemedText style={styles.postedText} themeColor="textSecondary">
-              📣 Posted {formatPosted(event.created_at)} by {event.postedBy}
+              Posted {formatPosted(event.created_at)} by {event.postedBy}
             </ThemedText>
           )}
 
           {friendsGoing.length > 0 && (
             <ThemedText style={styles.friendsGoing}>
-              👋 {friendsSummary(friendsGoing)}
+              {friendsSummary(friendsGoing)}
             </ThemedText>
           )}
 
@@ -378,7 +376,7 @@ export default function EventDetailScreen() {
           </View>
         </ShadowSurface>
 
-        <ThemedText style={styles.sectionTitle}>🎟️ WHO'S GOING ({rsvpers.length})</ThemedText>
+        <ThemedText style={styles.sectionTitle}>WHO'S GOING ({rsvpers.length})</ThemedText>
         {rsvpers.length === 0 ? (
           <ThemedText style={styles.noteText} themeColor="textSecondary">No RSVPs yet — be the first!</ThemedText>
         ) : (
@@ -404,7 +402,7 @@ export default function EventDetailScreen() {
           </View>
         )}
 
-        <ThemedText style={styles.sectionTitle}>💬 COMMENTS ({comments.length})</ThemedText>
+        <ThemedText style={styles.sectionTitle}>COMMENTS ({comments.length})</ThemedText>
 
         <View style={styles.commentRow}>
           <TextInput

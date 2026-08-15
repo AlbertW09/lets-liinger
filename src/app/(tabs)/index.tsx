@@ -367,10 +367,10 @@ export default function HomeScreen() {
   }), [colors]);
 
   const sortOptions: { key: SortMode; label: string }[] = [
-    { key: 'upcoming', label: '📅 Upcoming' },
-    { key: 'recent', label: '🆕 Recent' },
-    { key: 'popular', label: '🔥 Popular' },
-    { key: 'nearby', label: '📍 Nearby' },
+    { key: 'upcoming', label: 'Upcoming' },
+    { key: 'recent', label: 'Recent' },
+    { key: 'popular', label: 'Popular' },
+    { key: 'nearby', label: 'Nearby' },
   ];
 
   return (
@@ -434,13 +434,13 @@ export default function HomeScreen() {
             />
           ))}
           <Chip
-            label="🕰️ Past"
+            label="Past"
             selected={showPast}
             selectedColor={colors.accentCyan}
             onPress={togglePast}
           />
           <Chip
-            label="👥 Following"
+            label="Following"
             selected={followingOnly}
             selectedColor={colors.accentGreen}
             onPress={() => setFollowingOnly((v) => !v)}
@@ -487,12 +487,10 @@ export default function HomeScreen() {
               </View>
 
               <View style={styles.detailItem}>
-                <ThemedText style={styles.detailEmoji}>📍</ThemedText>
                 <ThemedText style={styles.detailText}>{event.location ?? 'TBD'}</ThemedText>
               </View>
 
               <View style={styles.detailItem}>
-                <ThemedText style={styles.detailEmoji}>🗓️</ThemedText>
                 <ThemedText style={styles.detailText}>
                   {formatEventTime(event.event_time)}
                 </ThemedText>
@@ -500,7 +498,6 @@ export default function HomeScreen() {
 
               {sortMode === 'nearby' && event.distance != null && (
                 <View style={styles.detailItem}>
-                  <ThemedText style={styles.detailEmoji}>🧭</ThemedText>
                   <ThemedText style={styles.detailText}>
                     {event.distance < 1
                       ? `${Math.round(event.distance * 1000)} m away`
@@ -511,7 +508,7 @@ export default function HomeScreen() {
 
               {event.rsvpCount > 0 && (
                 <ThemedText style={styles.rsvpLine} themeColor="textSecondary">
-                  🎟️ {rsvpSummary(event.rsvpers, event.rsvpCount)}
+                  {rsvpSummary(event.rsvpers, event.rsvpCount)}
                 </ThemedText>
               )}
 

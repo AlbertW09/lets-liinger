@@ -86,7 +86,7 @@ export default function SearchScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <ThemedText style={[styles.back, { color: colors.text }]}>‹ back</ThemedText>
         </TouchableOpacity>
-        <ThemedText style={[styles.title, { color: colors.text }]}>🔎 find people</ThemedText>
+        <ThemedText style={[styles.title, { color: colors.text }]}>find people</ThemedText>
 
         <TextField
           placeholder="Search by name or @username…"
@@ -112,7 +112,7 @@ export default function SearchScreen() {
             <ThemedText style={styles.note} themeColor="textSecondary">No one found for “{query.trim()}”.</ThemedText>
           ) : suggestions.length > 0 ? (
             <>
-              <ThemedText style={styles.suggestTitle}>✨ PEOPLE YOU MAY KNOW</ThemedText>
+              <ThemedText style={styles.suggestTitle}>PEOPLE YOU MAY KNOW</ThemedText>
               <ThemedText style={styles.suggestSub} themeColor="textSecondary">Based on interests you share.</ThemedText>
               {suggestions.map((p) => (
                 <PersonRow

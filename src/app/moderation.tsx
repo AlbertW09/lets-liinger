@@ -126,7 +126,7 @@ export default function ModerationScreen() {
           </View>
         ) : reports.length === 0 ? (
           <ThemedText style={styles.emptyText} themeColor="textSecondary">
-            {tab === 'open' ? '✅ No open reports. All clear.' : `No ${tab} reports.`}
+            {tab === 'open' ? 'No open reports. All clear.' : `No ${tab} reports.`}
           </ThemedText>
         ) : (
           reports.map((r) => {

@@ -253,11 +253,11 @@ export default function ProfileScreen() {
           style={styles.insightsBtn}
           onPress={() => router.push('/insights')}
         >
-          <ThemedText style={styles.insightsBtnText}>📊 MY EVENT INSIGHTS</ThemedText>
+          <ThemedText style={styles.insightsBtnText}>MY EVENT INSIGHTS</ThemedText>
         </ShadowSurface>
 
         <View style={styles.clubsHeader}>
-          <ThemedText style={styles.sectionTitle}>🏷️ MY CLUBS</ThemedText>
+          <ThemedText style={styles.sectionTitle}>MY CLUBS</ThemedText>
           <TouchableOpacity onPress={() => setAddingClub((v) => !v)}>
             <ThemedText style={[styles.addClubLink, { color: colors.accentCyan }]}>
               {addingClub ? 'Close' : '＋ Add'}
@@ -310,7 +310,7 @@ export default function ProfileScreen() {
         ))}
 
         <View style={styles.sectionHeader}>
-          <ThemedText style={styles.sectionTitle}>⚡️ MY ACTIVITY</ThemedText>
+          <ThemedText style={styles.sectionTitle}>MY ACTIVITY</ThemedText>
         </View>
 
         {savedEvents.length === 0 && (
@@ -332,7 +332,7 @@ export default function ProfileScreen() {
           >
             <Badge label="RSVP'D" backgroundColor={colors.accentGreen} style={styles.statusBadge} />
             <ThemedText style={styles.eventTitle}>{event.title}</ThemedText>
-            <ThemedText style={styles.eventMeta}>Hosted by {event.host} • 📍 {event.location}</ThemedText>
+            <ThemedText style={styles.eventMeta}>Hosted by {event.host} • {event.location}</ThemedText>
           </ShadowSurface>
         ))}
 

@@ -274,14 +274,14 @@ export default function CalendarScreen() {
 
         <View style={styles.sectionHeader}>
           <ThemedText style={styles.sectionTitle}>
-            📅 {prettyDate(selectedDateStr)}
+            {prettyDate(selectedDateStr)}
           </ThemedText>
         </View>
 
         {selectedEvents.length === 0 ? (
           <ShadowSurface backgroundColor={colors.backgroundElement} radius={18} offset={4} wrapperStyle={styles.eventCardShadow} style={styles.eventCard}>
             <ThemedText style={styles.noEventsText}>
-              NO EVENTS LINED UP FOR THIS DAY YET! 😴
+              NO EVENTS LINED UP FOR THIS DAY YET!
             </ThemedText>
           </ShadowSurface>
         ) : (
@@ -301,11 +301,9 @@ export default function CalendarScreen() {
 
               <View style={styles.detailsRow}>
                 <View style={styles.detailItem}>
-                  <ThemedText style={styles.detailEmoji}>🕒</ThemedText>
                   <ThemedText style={styles.detailText}>{evt.time}</ThemedText>
                 </View>
                 <View style={styles.detailItem}>
-                  <ThemedText style={styles.detailEmoji}>📍</ThemedText>
                   <ThemedText style={styles.detailText}>{evt.location}</ThemedText>
                 </View>
               </View>

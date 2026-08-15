@@ -259,9 +259,9 @@ export default function MapScreen() {
   const selected = pins.find((p) => p.id === selectedId) ?? null;
 
   const filters: { key: DateFilter; label: string }[] = [
-    { key: 'all', label: '🌐 All upcoming' },
-    { key: 'tonight', label: '🌙 Tonight' },
-    { key: 'week', label: '📆 This week' },
+    { key: 'all', label: 'All upcoming' },
+    { key: 'tonight', label: 'Tonight' },
+    { key: 'week', label: 'This week' },
   ];
 
   const dynamicStyles = useMemo(() => StyleSheet.create({
@@ -301,10 +301,10 @@ export default function MapScreen() {
           </TouchableOpacity>
         </View>
         <ThemedText style={styles.popupMeta} themeColor="textSecondary">
-          🕒 {formatEventTime(selected.event_time)}
+          {formatEventTime(selected.event_time)}
         </ThemedText>
         <ThemedText style={styles.popupMeta} themeColor="textSecondary">
-          📍 {selected.location ?? 'TBD'} · {selected.hostName}
+          {selected.location ?? 'TBD'} · {selected.hostName}
         </ThemedText>
         <View style={styles.popupActions}>
           <TouchableOpacity
@@ -390,10 +390,10 @@ export default function MapScreen() {
                 >
                   <ThemedText style={styles.popupTitle}>{pin.title}</ThemedText>
                   <ThemedText style={styles.popupMeta} themeColor="textSecondary">
-                    🕒 {formatEventTime(pin.event_time)}
+                    {formatEventTime(pin.event_time)}
                   </ThemedText>
                   <ThemedText style={styles.popupMeta} themeColor="textSecondary">
-                    📍 {pin.location ?? 'TBD'} · {pin.hostName}
+                    {pin.location ?? 'TBD'} · {pin.hostName}
                   </ThemedText>
                 </ShadowSurface>
               ))

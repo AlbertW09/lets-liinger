@@ -41,11 +41,11 @@ export default function InsightsScreen() {
   const maxRsvps = Math.max(1, ...(data?.events.map((e) => e.rsvps) ?? [0]));
 
   function hookLine(d: CreatorInsights): string {
-    if (d.totalEngagement === 0) return 'Share your events to start pulling a crowd. 🚀';
+    if (d.totalEngagement === 0) return 'Share your events to start pulling a crowd.';
     if (d.topEvent && d.topEvent.rsvps > 0) {
-      return `🔥 “${d.topEvent.title}” is your biggest hit — ${d.topEvent.rsvps} going!`;
+      return `“${d.topEvent.title}” is your biggest hit — ${d.topEvent.rsvps} going!`;
     }
-    return 'Your buzz is building — keep posting! 📈';
+    return 'Your buzz is building — keep posting!';
   }
 
   return (
@@ -54,14 +54,14 @@ export default function InsightsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <ThemedText style={[styles.back, { color: colors.text }]}>‹ back</ThemedText>
         </TouchableOpacity>
-        <ThemedText style={[styles.title, { color: colors.text }]}>📊 event insights</ThemedText>
+        <ThemedText style={[styles.title, { color: colors.text }]}>event insights</ThemedText>
 
         {loading ? (
           <View style={styles.loadingWrap}><ActivityIndicator size="large" color={colors.text} /></View>
         ) : !data || data.totalEvents === 0 ? (
           <ShadowSurface backgroundColor={colors.backgroundElement} radius={20} offset={5} wrapperStyle={styles.mb3}>
             <View style={styles.emptyCard}>
-              <ThemedText style={styles.emptyBig}>No events yet 👀</ThemedText>
+              <ThemedText style={styles.emptyBig}>No events yet</ThemedText>
               <ThemedText style={styles.emptyText} themeColor="textSecondary">
                 Post your first event and watch the RSVPs, likes, and comments roll in — your stats show up here.
               </ThemedText>
@@ -99,13 +99,13 @@ export default function InsightsScreen() {
             </View>
 
             <ThemedText style={styles.avgLine} themeColor="textSecondary">
-              📈 You average {plural(data.avgRsvps, 'RSVP')} per event.
+              You average {plural(data.avgRsvps, 'RSVP')} per event.
             </ThemedText>
 
             {/* Top event */}
             {data.topEvent && data.topEvent.rsvps > 0 && (
               <>
-                <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>🏆 TOP EVENT</ThemedText>
+                <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>TOP EVENT</ThemedText>
                 <ShadowSurface
                   backgroundColor={colors.accentYellow}
                   radius={16}
@@ -116,14 +116,14 @@ export default function InsightsScreen() {
                 >
                   <ThemedText style={styles.topTitle}>{data.topEvent.title}</ThemedText>
                   <ThemedText style={styles.topMeta}>
-                    🎟️ {data.topEvent.rsvps} · 💖 {data.topEvent.likes} · 💬 {data.topEvent.comments}
+                    {data.topEvent.rsvps} RSVPs · {data.topEvent.likes} likes · {data.topEvent.comments} comments
                   </ThemedText>
                 </ShadowSurface>
               </>
             )}
 
             {/* RSVPs per event bar chart */}
-            <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>🎟️ RSVPS BY EVENT</ThemedText>
+            <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>RSVPS BY EVENT</ThemedText>
             <ShadowSurface backgroundColor={colors.backgroundElement} radius={16} offset={4} wrapperStyle={styles.mb3}>
               <View style={styles.chartCard}>
                 {[...data.events]
@@ -148,7 +148,7 @@ export default function InsightsScreen() {
             </ShadowSurface>
 
             {/* Full breakdown */}
-            <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>⚡️ ENGAGEMENT BREAKDOWN</ThemedText>
+            <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>ENGAGEMENT BREAKDOWN</ThemedText>
             {data.events.map((e) => (
               <ShadowSurface
                 key={e.id}
@@ -162,10 +162,10 @@ export default function InsightsScreen() {
               >
                 <View style={styles.rowTop}>
                   <ThemedText style={styles.rowTitle} numberOfLines={1}>{e.title}</ThemedText>
-                  <Badge label={`⚡️ ${e.engagement}`} backgroundColor={colors.accentGreen} />
+                  <Badge label={`${e.engagement}`} backgroundColor={colors.accentGreen} />
                 </View>
                 <ThemedText style={styles.rowMeta} themeColor="textSecondary">
-                  🎟️ {e.rsvps} going · 💖 {plural(e.likes, 'like')} · 💬 {plural(e.comments, 'comment')}
+                  {e.rsvps} going · {plural(e.likes, 'like')} · {plural(e.comments, 'comment')}
                 </ThemedText>
               </ShadowSurface>
             ))}
