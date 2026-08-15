@@ -35,6 +35,9 @@ yarn-error.*
 .env.*
 !.env.example
 
+# Firebase service account key (secret — google-services.json is fine to commit, this is not)
+*firebase-adminsdk*.json
+
 # typescript
 *.tsbuildinfo
 
