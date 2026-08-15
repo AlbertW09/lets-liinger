@@ -432,7 +432,12 @@ export default function HomeScreen() {
           <ThemedText style={styles.boldText}>+ CREATE EVENT</ThemedText>
         </ShadowSurface>
 
-        <View style={styles.sortRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.sortRowScroll}
+          contentContainerStyle={styles.sortRow}
+        >
           {sortOptions.map((opt) => (
             <Chip
               key={opt.key}
@@ -454,7 +459,7 @@ export default function HomeScreen() {
             onPress={() => setFollowingOnly((v) => !v)}
             style={styles.followingChip}
           />
-        </View>
+        </ScrollView>
 
         {followingOnly && visibleEvents.length === 0 && !loading && (
           <ThemedText style={styles.noteText} themeColor="textSecondary">
@@ -622,7 +627,8 @@ const styles = StyleSheet.create({
   searchIcon: { fontSize: 15, paddingLeft: Spacing.two },
   createShadow: { marginBottom: Spacing.three },
   createBtn: { paddingVertical: Spacing.two, alignItems: 'center' },
-  sortRow: { flexDirection: 'row', gap: Spacing.two, marginBottom: Spacing.three },
+  sortRowScroll: { marginBottom: Spacing.three },
+  sortRow: { flexDirection: 'row', gap: Spacing.two, flexGrow: 1 },
   followingChip: { marginLeft: 'auto' },
   noteText: { fontSize: 13, fontWeight: '600', marginBottom: Spacing.three },
   cardShadow: { marginBottom: Spacing.four },
