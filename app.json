@@ -28,7 +28,9 @@
         "ACCESS_FINE_LOCATION",
         "CAMERA",
         "READ_MEDIA_IMAGES"
-      ]
+      ],
+      "package": "com.letsliinger.LetsLiinger",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
@@ -47,11 +49,19 @@
       "expo-image",
       "expo-status-bar",
       "expo-web-browser",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f4ab3b37-e91d-4147-92f9-ca8b892d9b0e"
+      }
+    },
+    "owner": "albertwongs-team"
   }
 }

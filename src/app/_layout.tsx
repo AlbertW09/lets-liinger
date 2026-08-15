@@ -5,6 +5,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { NotificationsProvider } from '@/hooks/notifications-context';
+import { usePushNotificationRouting } from '@/hooks/use-push-router';
+import { refreshPushToken } from '@/lib/push';
 import { supabase } from '../supabaseClient';
 
 SplashScreen.preventAutoHideAsync();
@@ -28,6 +30,12 @@ export default function RootLayout() {
 
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  usePushNotificationRouting();
+
+  useEffect(() => {
+    if (session?.user?.id) refreshPushToken(session.user.id);
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (loading) return;

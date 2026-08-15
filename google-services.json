@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "444346333353",
+    "project_id": "letsliinger-d3931",
+    "storage_bucket": "letsliinger-d3931.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:444346333353:android:1a29b2bdde1ab8066dd1b8",
+        "android_client_info": {
+          "package_name": "com.letsliinger.LetsLiinger"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCGD8Jo22vFbvCvoAlsc-qi21KV6INRaro"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
