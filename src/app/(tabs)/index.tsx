@@ -84,6 +84,14 @@ function distanceKm(a: Coords, b: Coords): number {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+// Human-readable distance in miles (feet when very close).
+function milesAway(km: number): string {
+  const miles = km * 0.621371;
+  return miles < 0.1
+    ? `${Math.round(miles * 5280)} ft away`
+    : `${miles.toFixed(1)} mi away`;
+}
+
 // `event_time` is stored as a naive local timestamp (no timezone — see
 // toEventTimeIso in event-form-modal.tsx), so "now" for comparison has to be
 // built the same way instead of via toISOString(), which would shift by the
@@ -499,9 +507,7 @@ export default function HomeScreen() {
               {sortMode === 'nearby' && event.distance != null && (
                 <View style={styles.detailItem}>
                   <ThemedText style={styles.detailText}>
-                    {event.distance < 1
-                      ? `${Math.round(event.distance * 1000)} m away`
-                      : `${event.distance.toFixed(1)} km away`}
+                    {milesAway(event.distance)}
                   </ThemedText>
                 </View>
               )}
