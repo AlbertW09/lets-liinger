@@ -4,7 +4,6 @@ import { ActivityIndicator, Modal, ScrollView, StyleSheet, TouchableOpacity, Vie
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { IconButton } from '@/components/ui/icon-button';
 import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
@@ -100,7 +99,6 @@ export default function MessagesScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <ThemedText style={dynamicStyles.headerText}>messages</ThemedText>
-          <IconButton emoji="💬" />
         </View>
 
         <ShadowSurface
@@ -163,7 +161,6 @@ export default function MessagesScreen() {
 
             <TextField
               label="Search by username"
-              placeholder="alex_y2k"
               autoCapitalize="none"
               autoFocus
               value={searchQuery}

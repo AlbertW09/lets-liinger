@@ -153,17 +153,16 @@ export default function OnboardingScreen() {
           </TouchableOpacity>
         </View>
 
-        <TextField label="Your name" placeholder="Alex Rivera" value={displayName} onChangeText={setDisplayName} />
+        <TextField label="Your name" value={displayName} onChangeText={setDisplayName} />
 
         <ThemedText style={styles.label} themeColor="accentCyan">Username</ThemedText>
         <View style={styles.usernameRow}>
           <ThemedText style={[styles.at, { color: colors.accentYellow }]}>@</ThemedText>
-          <TextField containerStyle={styles.flex1} placeholder="alex_y2k" autoCapitalize="none" value={username} onChangeText={setUsername} />
+          <TextField containerStyle={styles.flex1} autoCapitalize="none" value={username} onChangeText={setUsername} />
         </View>
 
         <TextField
           label="Bio"
-          placeholder="Senior @ Campus | Music & retro gaming"
           multiline
           maxLength={160}
           style={styles.bioInput}

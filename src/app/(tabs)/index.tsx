@@ -379,9 +379,9 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <ThemedText style={dynamicStyles.headerText}>LetsLiinger</ThemedText>
           <View style={styles.headerActions}>
-            <IconButton emoji="🔎" size={20} onPress={() => router.push('/search')} />
+            <IconButton icon={require('@/assets/images/icons/search.png')} size={20} onPress={() => router.push('/search')} />
             <View>
-              <IconButton emoji="🔔" size={20} onPress={() => router.push('/notifications')} />
+              <IconButton icon={require('@/assets/images/icons/bell.png')} size={20} onPress={() => router.push('/notifications')} />
               {unreadNotifs > 0 && (
                 <View style={[styles.badge, { backgroundColor: colors.accentPink, borderColor: colors.border }]}>
                   <ThemedText style={styles.badgeText}>{unreadNotifs > 9 ? '9+' : unreadNotifs}</ThemedText>

@@ -171,7 +171,7 @@ export default function ProfileScreen() {
         <View style={styles.header}>
           <ThemedText style={dynamicStyles.headerText}>my profile</ThemedText>
           <View style={styles.headerActions}>
-            <IconButton emoji="🔎" onPress={() => router.push('/search')} />
+            <IconButton icon={require('@/assets/images/icons/search.png')} onPress={() => router.push('/search')} />
             <IconButton emoji="⚙️" onPress={() => router.push('/settings')} />
           </View>
         </View>

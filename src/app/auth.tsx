@@ -93,7 +93,7 @@ export default function AuthScreen() {
             See what&apos;s happenin
           </ThemedText>
 
-          <TextField label="Email" placeholder="you@email.com" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" value={email} onChangeText={setEmail} />
+          <TextField label="Email" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" value={email} onChangeText={setEmail} />
           <TextField label="Password" secureTextEntry value={password} onChangeText={setPassword} />
 
           {/* Age gate + Terms — required for account creation */}

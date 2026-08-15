@@ -169,7 +169,7 @@ export function EventFormModal({ visible, mode, initialValues, onClose, onSubmit
             <View style={styles.spacer} />
           </View>
 
-          <TextField label="Title" placeholder="House Party & Indie Jam" value={title} onChangeText={setTitle} />
+          <TextField label="Title" value={title} onChangeText={setTitle} />
           <TextField
             label="Description"
             placeholder="What's the vibe?"
