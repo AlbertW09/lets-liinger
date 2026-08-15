@@ -20,5 +20,7 @@
   // Test files are type-checked separately by ts-jest (see tsconfig.jest.json)
   // using Node-style module resolution, which is what Jest actually runs
   // under — this app config targets Metro's bundler resolution instead.
-  "exclude": ["**/__tests__/**"]
+  // `supabase/functions` is Deno code (Deno globals + jsr: imports), compiled
+  // by Supabase's own runtime, not part of the React Native app.
+  "exclude": ["**/__tests__/**", "supabase"]
 }
