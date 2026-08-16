@@ -34,6 +34,11 @@ export default function ProfileScreen() {
     avatar_url: string | null;
     interests: string[];
     extracurriculars: { name: string; role: string }[];
+    university: string | null;
+    major: string | null;
+    minor: string | null;
+    grad_year: string | null;
+    cohort: string | null;
   } | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [savedEvents, setSavedEvents] = useState<{
@@ -92,7 +97,7 @@ export default function ProfileScreen() {
         const [profileRes, rsvpRes] = await Promise.all([
           supabase
             .from('profiles')
-            .select('display_name, username, bio, avatar_url, interests, extracurriculars')
+            .select('display_name, username, bio, avatar_url, interests, extracurriculars, university, major, minor, grad_year, cohort')
             .eq('id', user.id)
             .single(),
           supabase
@@ -188,6 +193,25 @@ export default function ProfileScreen() {
           </ThemedText>
 
           <Badge label={`@${profile?.username || 'username'}`} backgroundColor={colors.accentCyan} radius={12} style={styles.handleBadge} />
+
+          {(profile?.grad_year || profile?.university) && (
+            <ThemedText style={styles.academicPrimary} themeColor="textSecondary">
+              {[profile?.grad_year ? `Class of ${profile.grad_year}` : null, profile?.university]
+                .filter(Boolean)
+                .join(' · ')}
+            </ThemedText>
+          )}
+          {(profile?.major || profile?.minor || profile?.cohort) && (
+            <ThemedText style={styles.academicSecondary} themeColor="textSecondary">
+              {[
+                profile?.major,
+                profile?.minor ? `Minor in ${profile.minor}` : null,
+                profile?.cohort,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </ThemedText>
+          )}
 
           <View style={styles.followRow}>
             <TouchableOpacity
@@ -365,6 +389,8 @@ const styles = StyleSheet.create({
   profileCardShadow: { marginBottom: Spacing.four },
   profileCard: { padding: Spacing.four, alignItems: 'center' },
   handleBadge: { marginTop: Spacing.one, marginBottom: Spacing.two, alignSelf: 'center' },
+  academicPrimary: { fontSize: 13, fontWeight: '800', textAlign: 'center', marginBottom: 2 },
+  academicSecondary: { fontSize: 12, fontWeight: '600', textAlign: 'center', marginBottom: Spacing.two },
   followRow: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.two },
   followStat: { alignItems: 'center', paddingHorizontal: Spacing.four },
   followDivider: { width: 2, height: 28, opacity: 0.5 },

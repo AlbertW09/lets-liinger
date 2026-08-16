@@ -124,7 +124,7 @@ describe('sendDirectMessage', () => {
 
     const result = await sendDirectMessage('a', 'b', 'hello');
 
-    expect(builder.insert).toHaveBeenCalledWith({ sender_id: 'a', recipient_id: 'b', content: 'hello' });
+    expect(builder.insert).toHaveBeenCalledWith({ sender_id: 'a', recipient_id: 'b', content: 'hello', reply_to_id: null });
     expect(result).toEqual({});
   });
 

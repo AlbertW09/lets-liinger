@@ -5,6 +5,12 @@ export interface ProfileLite {
   username: string | null;
   display_name: string | null;
   avatar_url: string | null;
+  // Academic info (only populated by fetchProfile, for the thread header).
+  university?: string | null;
+  grad_year?: string | null;
+  major?: string | null;
+  minor?: string | null;
+  cohort?: string | null;
 }
 
 export interface DirectMessage {
@@ -13,6 +19,8 @@ export interface DirectMessage {
   recipient_id: string;
   content: string;
   created_at: string;
+  reply_to_id: string | null;
+  liked: boolean;
 }
 
 export interface ConversationSummary {
@@ -56,7 +64,7 @@ export async function fetchConversations(myUserId: string): Promise<Conversation
 export async function fetchThread(myUserId: string, otherUserId: string, limit = 50): Promise<DirectMessage[]> {
   const { data } = await supabase
     .from('direct_messages')
-    .select('id, sender_id, recipient_id, content, created_at')
+    .select('id, sender_id, recipient_id, content, created_at, reply_to_id, liked')
     .or(`and(sender_id.eq.${myUserId},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${myUserId})`)
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -67,19 +75,28 @@ export async function fetchThread(myUserId: string, otherUserId: string, limit =
 export async function sendDirectMessage(
   senderId: string,
   recipientId: string,
-  content: string
+  content: string,
+  replyToId?: string | null
 ): Promise<{ error?: string }> {
   const { error } = await supabase
     .from('direct_messages')
-    .insert({ sender_id: senderId, recipient_id: recipientId, content });
+    .insert({ sender_id: senderId, recipient_id: recipientId, content, reply_to_id: replyToId ?? null });
   if (error) return { error: error.message };
   return {};
+}
+
+// Double-tap like: flips the `liked` flag via a SECURITY DEFINER RPC that only
+// lets participants toggle their own conversation's messages. Returns the new
+// liked state.
+export async function toggleMessageLike(messageId: string): Promise<boolean> {
+  const { data } = await supabase.rpc('toggle_dm_like', { msg_id: messageId });
+  return !!data;
 }
 
 export async function fetchProfile(userId: string): Promise<ProfileLite | null> {
   const { data } = await supabase
     .from('profiles')
-    .select('id, username, display_name, avatar_url')
+    .select('id, username, display_name, avatar_url, university, grad_year, major, minor, cohort')
     .eq('id', userId)
     .single();
   return (data as ProfileLite) ?? null;

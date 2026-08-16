@@ -21,6 +21,11 @@ interface ViewProfile {
   avatar_url: string | null;
   interests: string[] | null;
   extracurriculars: { name: string; role: string }[] | null;
+  university: string | null;
+  major: string | null;
+  minor: string | null;
+  grad_year: string | null;
+  cohort: string | null;
 }
 
 export default function UserProfileScreen() {
@@ -54,7 +59,7 @@ export default function UserProfileScreen() {
         setSelfId(user?.id ?? null);
 
         const [profRes, c, isF, mut, myBlocked] = await Promise.all([
-          supabase.from('profiles').select('id, display_name, username, bio, avatar_url, interests, extracurriculars').eq('id', id).single(),
+          supabase.from('profiles').select('id, display_name, username, bio, avatar_url, interests, extracurriculars, university, major, minor, grad_year, cohort').eq('id', id).single(),
           getFollowCounts(id),
           user ? checkFollowing(user.id, id) : Promise.resolve(false),
           user ? getMutualFollowers(user.id, id) : Promise.resolve({ names: [], count: 0 }),
@@ -154,6 +159,20 @@ export default function UserProfileScreen() {
 
           <ThemedText style={styles.userName}>{name}</ThemedText>
           <Badge label={`@${profile.username || 'username'}`} backgroundColor={colors.accentCyan} radius={12} style={styles.handleBadge} />
+
+          {(profile.grad_year || profile.university) && (
+            <ThemedText style={styles.academicPrimary} themeColor="textSecondary">
+              {[profile.grad_year ? `Class of ${profile.grad_year}` : null, profile.university]
+                .filter(Boolean).join(' · ')}
+            </ThemedText>
+          )}
+          {(profile.major || profile.minor || profile.cohort) && (
+            <ThemedText style={styles.academicSecondary} themeColor="textSecondary">
+              {[profile.major, profile.minor ? `Minor in ${profile.minor}` : null, profile.cohort]
+                .filter(Boolean).join(' · ')}
+            </ThemedText>
+          )}
+
           <ThemedText style={styles.bio}>{profile.bio || 'No bio yet.'}</ThemedText>
 
           {!!profile.interests?.length && (
@@ -276,6 +295,8 @@ const styles = StyleSheet.create({
   userName: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
   handleBadge: { marginTop: Spacing.one, marginBottom: Spacing.two },
   bio: { fontSize: 13, fontWeight: '600', textAlign: 'center', opacity: 0.8, marginVertical: Spacing.one },
+  academicPrimary: { fontSize: 13, fontWeight: '800', textAlign: 'center', marginBottom: 2 },
+  academicSecondary: { fontSize: 12, fontWeight: '600', textAlign: 'center', marginBottom: Spacing.two },
   interestsWrap: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: Spacing.one, marginBottom: Spacing.one },
   interestChip: { borderWidth: 1.5, borderRadius: 999, paddingHorizontal: Spacing.two, paddingVertical: 3 },
   interestChipText: { fontSize: 10, fontWeight: '800' },

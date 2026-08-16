@@ -29,6 +29,11 @@ export default function OnboardingScreen() {
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
+  const [university, setUniversity] = useState('');
+  const [major, setMajor] = useState('');
+  const [minor, setMinor] = useState('');
+  const [gradYear, setGradYear] = useState('');
+  const [cohort, setCohort] = useState('');
   const [interests, setInterests] = useState<string[]>([]);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -89,6 +94,11 @@ export default function OnboardingScreen() {
         display_name: displayName.trim(),
         username: username.trim().toLowerCase().replace(/\s+/g, '_'),
         bio: bio.trim(),
+        university: university.trim() || null,
+        major: major.trim() || null,
+        minor: minor.trim() || null,
+        grad_year: gradYear.trim() || null,
+        cohort: cohort.trim() || null,
         avatar_url: avatarUrl,
         interests,
         extracurriculars: myClubs.map(name => ({ name, role: 'Member' })),
@@ -171,6 +181,18 @@ export default function OnboardingScreen() {
         />
         <ThemedText style={styles.counter} themeColor="textSecondary">{bio.length}/160</ThemedText>
 
+        <ThemedText style={styles.label} themeColor="accentCyan">School</ThemedText>
+        <ThemedText style={styles.hint} themeColor="textSecondary">So classmates can find their people. All optional.</ThemedText>
+        <TextField label="University" placeholder="UC Santa Cruz" value={university} onChangeText={setUniversity} />
+        <View style={styles.row2}>
+          <TextField containerStyle={styles.flex1} label="Grad year" placeholder="2027" keyboardType="number-pad" value={gradYear} onChangeText={setGradYear} />
+          <TextField containerStyle={styles.flex1} label="Cohort" placeholder="Transfer '24" value={cohort} onChangeText={setCohort} />
+        </View>
+        <View style={styles.row2}>
+          <TextField containerStyle={styles.flex1} label="Major" placeholder="Computer Science" value={major} onChangeText={setMajor} />
+          <TextField containerStyle={styles.flex1} label="Minor" placeholder="Music" value={minor} onChangeText={setMinor} />
+        </View>
+
         <ThemedText style={styles.label} themeColor="accentCyan">What are you into?</ThemedText>
         <ThemedText style={styles.hint} themeColor="textSecondary">Pick as many as you like.</ThemedText>
         <View style={styles.chipWrap}>
@@ -180,7 +202,7 @@ export default function OnboardingScreen() {
         </View>
 
         <ThemedText style={styles.label} themeColor="accentCyan">Your clubs</ThemedText>
-        <ThemedText style={styles.hint} themeColor="textSecondary">Pick the clubs you're in — or add a new one.</ThemedText>
+        <ThemedText style={styles.hint} themeColor="textSecondary">Pick the clubs you&apos;re in — or add a new one.</ThemedText>
         <ClubChipPicker
           clubs={clubs}
           isSelected={(label) => myClubs.includes(label)}
@@ -222,6 +244,7 @@ const styles = StyleSheet.create({
   usernameRow: { flexDirection: 'row', alignItems: 'center' },
   at: { fontSize: 20, fontWeight: '900', marginRight: Spacing.two },
   flex1: { flex: 1 },
+  row2: { flexDirection: 'row', gap: Spacing.two },
   bioInput: { height: 90, textAlignVertical: 'top' },
   counter: { fontSize: 11, textAlign: 'right', marginTop: Spacing.one },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, marginBottom: Spacing.two },
