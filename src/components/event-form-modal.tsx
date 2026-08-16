@@ -78,7 +78,7 @@ function toEventTimeIso(date: Date, time: Date | null): string {
 export function EventFormModal({ visible, mode, initialValues, onClose, onSubmit, onSuccess }: EventFormModalProps) {
   const theme = useTheme();
   const { clubs, create: createClub } = useClubs();
-  const userCoords = useUserCoords();
+  const { coords: userCoords } = useUserCoords();
   const place = usePlaceSearch(null, userCoords);
 
   const [title, setTitle] = useState('');

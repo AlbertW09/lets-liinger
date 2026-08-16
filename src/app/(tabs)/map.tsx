@@ -5,48 +5,24 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LeafletWebViewMap } from '@/components/map/leaflet-webview-map';
 import { ThemedText } from '@/components/themed-text';
 import { Chip } from '@/components/ui/chip';
 import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useUserCoords } from '@/hooks/use-user-coords';
+import {
+  DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM, FIT_BOUNDS_OPTS,
+  OSM_ATTRIBUTION, OSM_MAX_ZOOM, OSM_TILE_URL, SINGLE_POINT_ZOOM,
+} from '@/lib/map-config';
+import { buildMarkerPayload, MapMarker, PinEvent } from '@/lib/map-markers';
 import { supabase } from '../../supabaseClient';
 
 type DateFilter = 'all' | 'tonight' | 'week';
 
-interface Coords {
-  lat: number;
-  lng: number;
-}
-
-interface PinEvent {
-  id: string;
-  title: string;
-  location: string | null;
-  event_time: string | null;
-  lat: number;
-  lng: number;
-  hostName: string;
-  rsvpedByMe: boolean;
-}
-
 const MAP_EL_ID = 'liinger-leaflet-map';
 const IS_WEB = Platform.OS === 'web';
-
-// Browser-only geolocation, guarded for SSR/native.
-function getCurrentCoords(): Promise<Coords | null> {
-  return new Promise((resolve) => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      resolve(null);
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => resolve(null),
-      { enableHighAccuracy: false, timeout: 8000 }
-    );
-  });
-}
 
 // Load Leaflet from CDN once (web only). Resolves with window.L.
 function loadLeaflet(): Promise<any> {
@@ -93,10 +69,10 @@ function formatEventTime(iso: string | null): string {
 export default function MapScreen() {
   const colors = useTheme();
   const router = useRouter();
+  const { coords: userCoords } = useUserCoords(true);
 
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
-  const [userCoords, setUserCoords] = useState<Coords | null>(null);
   const [pins, setPins] = useState<PinEvent[]>([]);
   const [missingCoords, setMissingCoords] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -108,8 +84,6 @@ export default function MapScreen() {
   const leafletRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const fitKeyRef = useRef<string>('');
-
-  const pinAccents = [colors.accentPink, colors.accentCyan, colors.accentYellow, colors.accentGreen];
 
   const fetchAll = useCallback(async (filter: DateFilter) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -160,16 +134,8 @@ export default function MapScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      (async () => {
-        if (!userCoords) {
-          const c = await getCurrentCoords();
-          if (!cancelled && c) setUserCoords(c);
-        }
-        if (!cancelled) await fetchAll(dateFilter);
-      })();
-      return () => { cancelled = true; };
-    }, [fetchAll, dateFilter, userCoords])
+      fetchAll(dateFilter);
+    }, [fetchAll, dateFilter])
   );
 
   // Initialise the Leaflet map once (web only).
@@ -182,10 +148,10 @@ export default function MapScreen() {
         leafletRef.current = L;
         const el = document.getElementById(MAP_EL_ID);
         if (!el || mapRef.current) return;
-        const map = L.map(el, { scrollWheelZoom: true, zoomControl: true }).setView([37.9, -122.1], 9);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; OpenStreetMap contributors',
-          maxZoom: 19,
+        const map = L.map(el, { scrollWheelZoom: true, zoomControl: true }).setView(DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM);
+        L.tileLayer(OSM_TILE_URL, {
+          attribution: OSM_ATTRIBUTION,
+          maxZoom: OSM_MAX_ZOOM,
         }).addTo(map);
         map.on('click', () => setSelectedId(null));
         mapRef.current = map;
@@ -201,49 +167,30 @@ export default function MapScreen() {
     if (!IS_WEB || !mapReady || !mapRef.current || !leafletRef.current) return;
     const L = leafletRef.current;
     const map = mapRef.current;
-    const border = colors.border;
 
-    // clear old markers
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
 
-    pins.forEach((pin, idx) => {
-      const bg = pin.rsvpedByMe ? colors.accentGreen : pinAccents[idx % pinAccents.length];
-      const glyph = pin.rsvpedByMe ? '✓' : '📍';
-      const icon = L.divIcon({
-        className: '',
-        html: `<div style="width:28px;height:28px;border-radius:50%;background:${bg};border:3px solid ${border};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#000;box-shadow:2px 2px 0 ${border};">${glyph}</div>`,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
-      });
-      const marker = L.marker([pin.lat, pin.lng], { icon }).addTo(map);
-      marker.on('click', () => setSelectedId(pin.id));
+    const markers: MapMarker[] = buildMarkerPayload(pins, userCoords, colors);
+    markers.forEach((m) => {
+      const icon = L.divIcon({ className: '', html: m.iconHtml, iconSize: m.iconSize, iconAnchor: m.iconAnchor });
+      const marker = L.marker([m.lat, m.lng], { icon }).addTo(map);
+      if (!m.isUser) marker.on('click', () => setSelectedId(m.id));
       markersRef.current.push(marker);
     });
 
-    if (userCoords) {
-      const userIcon = L.divIcon({
-        className: '',
-        html: `<div style="width:18px;height:18px;border-radius:50%;background:${colors.accentCyan};border:3px solid ${border};box-shadow:0 0 0 6px ${colors.accentCyan}55;"></div>`,
-        iconSize: [18, 18],
-        iconAnchor: [9, 9],
-      });
-      markersRef.current.push(L.marker([userCoords.lat, userCoords.lng], { icon: userIcon }).addTo(map));
-    }
-
     // Fit bounds only when the set of points actually changes (not on RSVP toggles).
-    const pts: [number, number][] = pins.map((p) => [p.lat, p.lng]);
-    if (userCoords) pts.push([userCoords.lat, userCoords.lng]);
+    const pts: [number, number][] = markers.map((m) => [m.lat, m.lng]);
     const fitKey = pts.map((p) => p.join(',')).sort().join('|');
     if (fitKey && fitKey !== fitKeyRef.current) {
       if (pts.length === 1) {
-        map.setView(pts[0], 15);
+        map.setView(pts[0], SINGLE_POINT_ZOOM);
       } else if (pts.length > 1) {
-        map.fitBounds(pts, { padding: [50, 50], maxZoom: 16 });
+        map.fitBounds(pts, FIT_BOUNDS_OPTS);
       }
       fitKeyRef.current = fitKey;
     }
-  }, [pins, userCoords, mapReady, colors.border, colors.accentGreen, colors.accentCyan]);
+  }, [pins, userCoords, mapReady, colors]);
 
   async function toggleRsvp(pin: PinEvent) {
     if (!userId) return;
@@ -332,72 +279,50 @@ export default function MapScreen() {
           ))}
         </View>
 
-        {IS_WEB ? (
-          <ShadowSurface
-            backgroundColor={colors.backgroundElement}
-            radius={20}
-            offset={5}
-            wrapperStyle={styles.mapShadow}
-            style={styles.mapWrap}
-          >
-            {/* Leaflet mounts into this element */}
+        <ShadowSurface
+          backgroundColor={colors.backgroundElement}
+          radius={20}
+          offset={5}
+          wrapperStyle={styles.mapShadow}
+          style={styles.mapWrap}
+        >
+          {IS_WEB ? (
+            // Leaflet mounts into this element
             <View nativeID={MAP_EL_ID} style={StyleSheet.absoluteFill} />
+          ) : (
+            <LeafletWebViewMap
+              pins={pins}
+              userCoords={userCoords}
+              colors={colors}
+              onMarkerPress={setSelectedId}
+              onMapPress={() => setSelectedId(null)}
+              onReady={() => setMapReady(true)}
+              onError={() => setMapError(true)}
+            />
+          )}
 
-            {(!mapReady || loading) && !mapError && (
-              <View style={styles.overlayCenter} pointerEvents="none">
-                <ActivityIndicator size="large" color={colors.text} />
-              </View>
-            )}
-            {mapError && (
-              <View style={styles.overlayCenter} pointerEvents="none">
-                <ThemedText style={styles.emptyText} themeColor="textSecondary">
-                  Couldn’t load the map. Check your connection.
-                </ThemedText>
-              </View>
-            )}
-            {mapReady && !loading && pins.length === 0 && (
-              <View style={styles.overlayCenter} pointerEvents="none">
-                <View style={dynamicStyles.emptyPill}>
-                  <ThemedText style={styles.emptyText}>No upcoming events with a location here.</ThemedText>
-                </View>
-              </View>
-            )}
-
-            {renderPopup()}
-          </ShadowSurface>
-        ) : (
-          // Native fallback: a simple tappable list
-          <View>
-            {loading ? (
-              <ActivityIndicator size="large" color={colors.text} style={{ marginVertical: Spacing.six }} />
-            ) : pins.length === 0 ? (
+          {(!mapReady || loading) && !mapError && (
+            <View style={styles.overlayCenter} pointerEvents="none">
+              <ActivityIndicator size="large" color={colors.text} />
+            </View>
+          )}
+          {mapError && (
+            <View style={styles.overlayCenter} pointerEvents="none">
               <ThemedText style={styles.emptyText} themeColor="textSecondary">
-                No upcoming events with a location.
+                Couldn’t load the map. Check your connection.
               </ThemedText>
-            ) : (
-              pins.map((pin) => (
-                <ShadowSurface
-                  key={pin.id}
-                  backgroundColor={colors.backgroundElement}
-                  radius={16}
-                  offset={3}
-                  borderWidth={2}
-                  wrapperStyle={styles.listCardShadow}
-                  style={styles.listCard}
-                  onPress={() => router.push(`/event-detail?id=${pin.id}`)}
-                >
-                  <ThemedText style={styles.popupTitle}>{pin.title}</ThemedText>
-                  <ThemedText style={styles.popupMeta} themeColor="textSecondary">
-                    {formatEventTime(pin.event_time)}
-                  </ThemedText>
-                  <ThemedText style={styles.popupMeta} themeColor="textSecondary">
-                    {pin.location ?? 'TBD'} · {pin.hostName}
-                  </ThemedText>
-                </ShadowSurface>
-              ))
-            )}
-          </View>
-        )}
+            </View>
+          )}
+          {mapReady && !loading && pins.length === 0 && (
+            <View style={styles.overlayCenter} pointerEvents="none">
+              <View style={dynamicStyles.emptyPill}>
+                <ThemedText style={styles.emptyText}>No upcoming events with a location here.</ThemedText>
+              </View>
+            </View>
+          )}
+
+          {renderPopup()}
+        </ShadowSurface>
 
         <View style={styles.legendRow}>
           <View style={styles.legendItem}>
@@ -414,7 +339,7 @@ export default function MapScreen() {
           </View>
         </View>
 
-        {IS_WEB && !userCoords && (
+        {!userCoords && (
           <ThemedText style={styles.noteText} themeColor="textSecondary">
             Turn on location to see where you are on the map.
           </ThemedText>
@@ -456,8 +381,6 @@ const styles = StyleSheet.create({
   popupMeta: { fontSize: 12, fontWeight: '700', marginTop: 2 },
   popupActions: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.three },
   btnText: { fontWeight: '900', color: '#000', fontSize: 13 },
-  listCardShadow: { marginBottom: Spacing.three },
-  listCard: { padding: Spacing.three },
   legendRow: { flexDirection: 'row', gap: Spacing.three, marginBottom: Spacing.two, flexWrap: 'wrap' },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
   legendDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 2 },

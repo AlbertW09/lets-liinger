@@ -18,8 +18,10 @@ import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { Spacing } from '@/constants/theme';
 import { useNotifications } from '@/hooks/notifications-context';
 import { useTheme } from '@/hooks/use-theme';
+import { useUserCoords } from '@/hooks/use-user-coords';
 import { getFollowingIds, getUnreadFollowerCount } from '../../lib/follows';
 import { getBlockedIds } from '../../lib/moderation';
+import type { Coords } from '../../lib/places';
 import { supabase } from '../../supabaseClient';
 
 type SortMode = 'upcoming' | 'popular' | 'recent' | 'nearby';
@@ -28,11 +30,6 @@ function eventTimeMs(iso: string | null): number | null {
   if (!iso) return null;
   const d = new Date(iso.includes('T') ? iso : iso.replace(' ', 'T'));
   return isNaN(d.getTime()) ? null : d.getTime();
-}
-
-interface Coords {
-  lat: number;
-  lng: number;
 }
 
 interface EnrichedEvent {
@@ -104,30 +101,15 @@ function nowAsNaiveTimestamp(): string {
 
 const PAGE_SIZE = 20;
 
-// Browser-only geolocation, guarded for SSR.
-function getCurrentCoords(): Promise<Coords | null> {
-  return new Promise((resolve) => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      resolve(null);
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => resolve(null),
-      { enableHighAccuracy: false, timeout: 8000 }
-    );
-  });
-}
-
 export default function HomeScreen() {
   const colors = useTheme();
   const router = useRouter();
   const { markEventsSeen } = useNotifications();
+  const { coords: userCoords, request: requestUserCoords } = useUserCoords(false);
 
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<EnrichedEvent[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
-  const [userCoords, setUserCoords] = useState<Coords | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('upcoming');
   const [followingOnly, setFollowingOnly] = useState(false);
@@ -307,11 +289,7 @@ export default function HomeScreen() {
   }
 
   async function enableNearby() {
-    let coords = userCoords;
-    if (!coords) {
-      coords = await getCurrentCoords();
-      setUserCoords(coords);
-    }
+    if (!userCoords) await requestUserCoords();
     setSortMode('nearby');
   }
 
