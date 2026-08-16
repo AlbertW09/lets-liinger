@@ -15,7 +15,6 @@ export interface MapPinColors {
   border: string;
   accentPink: string;
   accentCyan: string;
-  accentYellow: string;
   accentGreen: string;
 }
 
@@ -43,17 +42,17 @@ function userDotIcon(accentCyan: string, border: string): string {
 }
 
 // Builds the full set of markers (event pins + optional "you are here" dot)
-// for a given data snapshot. Cycles through the same 4 accent colors used
-// on the web map for non-RSVP'd pins.
+// for a given data snapshot. Non-RSVP'd pins are always pink (matching the
+// map's own legend, which labels pink as "Event") and RSVP'd ones are green
+// -- previously pins cycled through pink/cyan/yellow/green, which put cyan
+// pins on the map that were easy to mistake for the cyan "you are here" dot.
 export function buildMarkerPayload(
   pins: PinEvent[],
   userCoords: Coords | null,
   colors: MapPinColors
 ): MapMarker[] {
-  const pinAccents = [colors.accentPink, colors.accentCyan, colors.accentYellow, colors.accentGreen];
-
-  const markers: MapMarker[] = pins.map((pin, idx) => {
-    const bg = pin.rsvpedByMe ? colors.accentGreen : pinAccents[idx % pinAccents.length];
+  const markers: MapMarker[] = pins.map((pin) => {
+    const bg = pin.rsvpedByMe ? colors.accentGreen : colors.accentPink;
     const glyph = pin.rsvpedByMe ? '✓' : '📍';
     return {
       id: pin.id,

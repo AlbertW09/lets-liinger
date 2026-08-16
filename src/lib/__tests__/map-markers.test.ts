@@ -4,7 +4,6 @@ const colors: MapPinColors = {
   border: '#000',
   accentPink: '#f0a',
   accentCyan: '#0af',
-  accentYellow: '#ff0',
   accentGreen: '#0f0',
 };
 
@@ -31,15 +30,14 @@ describe('buildMarkerPayload', () => {
     expect(markers[0].isUser).toBeFalsy();
   });
 
-  it('cycles non-RSVP pins through the 4 accent colors by index', () => {
-    const pins = [pin({ id: '1' }), pin({ id: '2' }), pin({ id: '3' }), pin({ id: '4' }), pin({ id: '5' })];
+  it('always uses accentPink for non-RSVP\'d pins, regardless of position', () => {
+    const pins = [pin({ id: '1' }), pin({ id: '2' }), pin({ id: '3' })];
     const markers = buildMarkerPayload(pins, null, colors);
 
-    expect(markers[0].iconHtml).toContain(colors.accentPink);
-    expect(markers[1].iconHtml).toContain(colors.accentCyan);
-    expect(markers[2].iconHtml).toContain(colors.accentYellow);
-    expect(markers[3].iconHtml).toContain(colors.accentGreen);
-    expect(markers[4].iconHtml).toContain(colors.accentPink); // wraps around
+    markers.forEach((m) => {
+      expect(m.iconHtml).toContain(colors.accentPink);
+      expect(m.iconHtml).not.toContain(colors.accentCyan);
+    });
   });
 
   it('always uses accentGreen and a checkmark for RSVP\'d pins', () => {
