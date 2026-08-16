@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AvatarSourceModal } from '@/components/avatar-source-modal';
 import { ClubChipPicker } from '@/components/club-chip-picker';
 import { ThemedText } from '@/components/themed-text';
 import { Chip } from '@/components/ui/chip';
@@ -13,7 +14,7 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useClubs } from '@/hooks/use-clubs';
 import { useTheme } from '@/hooks/use-theme';
-import { pickImageFile, uploadAvatar } from '../lib/avatar';
+import { AvatarSource, pickAndCropAvatar, uploadAvatar } from '../lib/avatar';
 import { supabase } from '../supabaseClient';
 
 const INTEREST_OPTIONS = [
@@ -39,6 +40,7 @@ export default function EditProfileScreen() {
   const [cohort, setCohort] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarMenuVisible, setAvatarMenuVisible] = useState(false);
   const [interests, setInterests] = useState<string[]>([]);
   const [extracurriculars, setExtracurriculars] = useState<{ name: string; role: string }[]>([]);
 
@@ -81,9 +83,10 @@ export default function EditProfileScreen() {
     load();
   }, []);
 
-  async function handlePickAvatar() {
+  async function handlePickAvatar(source: AvatarSource) {
+    setAvatarMenuVisible(false);
     if (!userId) return;
-    const file = await pickImageFile();
+    const file = await pickAndCropAvatar(source);
     if (!file) return;
     setUploadingAvatar(true);
     const url = await uploadAvatar(userId, file);
@@ -182,7 +185,7 @@ export default function EditProfileScreen() {
         <View style={styles.avatarWrap}>
           <TouchableOpacity
             style={[styles.avatarCircle, { borderColor: colors.border, backgroundColor: colors.accentYellow }]}
-            onPress={handlePickAvatar}
+            onPress={() => setAvatarMenuVisible(true)}
             activeOpacity={0.8}
           >
             {uploadingAvatar ? (
@@ -195,11 +198,17 @@ export default function EditProfileScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.changeAvatarBtn, { borderColor: colors.border, backgroundColor: colors.accentCyan }]}
-            onPress={handlePickAvatar}
+            onPress={() => setAvatarMenuVisible(true)}
           >
             <ThemedText style={styles.smallBtnText}>{avatarUrl ? 'Change photo' : 'Add photo'}</ThemedText>
           </TouchableOpacity>
         </View>
+
+        <AvatarSourceModal
+          visible={avatarMenuVisible}
+          onClose={() => setAvatarMenuVisible(false)}
+          onPick={handlePickAvatar}
+        />
 
         <TextField label="Your name" value={displayName} onChangeText={setDisplayName} />
 

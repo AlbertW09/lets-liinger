@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AvatarSourceModal } from '@/components/avatar-source-modal';
 import { ClubChipPicker } from '@/components/club-chip-picker';
 import { ThemedText } from '@/components/themed-text';
 import { Chip } from '@/components/ui/chip';
@@ -12,7 +13,7 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useClubs } from '@/hooks/use-clubs';
 import { useTheme } from '@/hooks/use-theme';
-import { pickImageFile, uploadAvatar } from '../lib/avatar';
+import { AvatarSource, pickAndCropAvatar, uploadAvatar } from '../lib/avatar';
 import { checkClean } from '../lib/profanity';
 import { supabase } from '../supabaseClient';
 
@@ -37,6 +38,7 @@ export default function OnboardingScreen() {
   const [interests, setInterests] = useState<string[]>([]);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarMenuVisible, setAvatarMenuVisible] = useState(false);
   const [myClubs, setMyClubs] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -51,10 +53,11 @@ export default function OnboardingScreen() {
     setMyClubs(prev => (prev.includes(label) ? prev.filter(c => c !== label) : [...prev, label]));
   }
 
-  async function handlePickAvatar() {
+  async function handlePickAvatar(source: AvatarSource) {
+    setAvatarMenuVisible(false);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const file = await pickImageFile();
+    const file = await pickAndCropAvatar(source);
     if (!file) return;
     setUploadingAvatar(true);
     const url = await uploadAvatar(user.id, file);
@@ -145,7 +148,7 @@ export default function OnboardingScreen() {
         <View style={styles.avatarWrap}>
           <TouchableOpacity
             style={[styles.avatarCircle, { borderColor: colors.border, backgroundColor: colors.accentYellow }]}
-            onPress={handlePickAvatar}
+            onPress={() => setAvatarMenuVisible(true)}
             activeOpacity={0.8}
           >
             {uploadingAvatar ? (
@@ -156,12 +159,18 @@ export default function OnboardingScreen() {
               <ThemedText style={styles.avatarPlaceholder}>📷</ThemedText>
             )}
           </TouchableOpacity>
-          <TouchableOpacity onPress={handlePickAvatar}>
+          <TouchableOpacity onPress={() => setAvatarMenuVisible(true)}>
             <ThemedText style={styles.avatarBtnText} themeColor="accentCyan">
               {avatarUrl ? 'Change photo' : 'Add a photo'}
             </ThemedText>
           </TouchableOpacity>
         </View>
+
+        <AvatarSourceModal
+          visible={avatarMenuVisible}
+          onClose={() => setAvatarMenuVisible(false)}
+          onPick={handlePickAvatar}
+        />
 
         <TextField label="Your name" value={displayName} onChangeText={setDisplayName} />
 

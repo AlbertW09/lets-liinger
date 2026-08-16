@@ -3,7 +3,7 @@ jest.mock('../../supabaseClient', () => ({
 }));
 
 import { supabase } from '../../supabaseClient';
-import { pickImageFile, uploadAvatar } from '../avatar';
+import { pickAndCropAvatar, uploadAvatar } from '../avatar';
 
 const mockStorageFrom = supabase.storage.from as jest.Mock;
 
@@ -11,7 +11,7 @@ function fakeFile(name: string, type?: string): File {
   return { name, type } as unknown as File;
 }
 
-describe('pickImageFile', () => {
+describe('pickAndCropAvatar', () => {
   afterEach(() => {
     delete (global as any).document;
   });
@@ -19,34 +19,8 @@ describe('pickImageFile', () => {
   it('resolves null when there is no DOM document (SSR/native)', async () => {
     delete (global as any).document;
 
-    await expect(pickImageFile()).resolves.toBeNull();
-  });
-
-  it('opens a file-picker input and resolves the chosen file', async () => {
-    const fakeInput: any = { click: jest.fn() };
-    (global as any).document = { createElement: jest.fn(() => fakeInput) };
-
-    const promise = pickImageFile();
-    const chosen = fakeFile('photo.png');
-    fakeInput.files = [chosen];
-    fakeInput.onchange();
-
-    expect(document.createElement).toHaveBeenCalledWith('input');
-    expect(fakeInput.type).toBe('file');
-    expect(fakeInput.accept).toBe('image/*');
-    expect(fakeInput.click).toHaveBeenCalled();
-    await expect(promise).resolves.toBe(chosen);
-  });
-
-  it('resolves null when the picker is dismissed without a file', async () => {
-    const fakeInput: any = { click: jest.fn() };
-    (global as any).document = { createElement: jest.fn(() => fakeInput) };
-
-    const promise = pickImageFile();
-    fakeInput.files = null;
-    fakeInput.onchange();
-
-    await expect(promise).resolves.toBeNull();
+    await expect(pickAndCropAvatar('library')).resolves.toBeNull();
+    await expect(pickAndCropAvatar('camera')).resolves.toBeNull();
   });
 });
 
