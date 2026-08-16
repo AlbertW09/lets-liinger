@@ -172,7 +172,7 @@ export default function EditProfileScreen() {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace('/profile'))}>
             <ThemedText style={[styles.headerText, { color: colors.text }]}>‹ back</ThemedText>
           </TouchableOpacity>
         </View>

@@ -102,7 +102,8 @@ export default function UserProfileScreen() {
       setBlocked(true);
       setFollowing(false);
       await blockUser(selfId, id);
-      router.back();
+      if (router.canGoBack()) router.back();
+      else router.replace('/');
     }
   }
 
@@ -127,7 +128,7 @@ export default function UserProfileScreen() {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
         <View style={styles.content}>
-          <TouchableOpacity onPress={() => router.back()}><ThemedText style={[styles.back, { color: colors.text }]}>‹ back</ThemedText></TouchableOpacity>
+          <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}><ThemedText style={[styles.back, { color: colors.text }]}>‹ back</ThemedText></TouchableOpacity>
           <ThemedText style={styles.note} themeColor="textSecondary">Profile not found.</ThemedText>
         </View>
       </SafeAreaView>
@@ -140,7 +141,7 @@ export default function UserProfileScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.topRow}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}>
             <ThemedText style={[styles.back, { color: colors.text }]}>‹ back</ThemedText>
           </TouchableOpacity>
           {selfId && <IconButton emoji="⋯" onPress={() => setMenuVisible(true)} />}

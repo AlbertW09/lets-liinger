@@ -100,7 +100,7 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace('/profile'))}>
           <ThemedText style={dynamicStyles.headerText}>‹ settings</ThemedText>
         </TouchableOpacity>
 

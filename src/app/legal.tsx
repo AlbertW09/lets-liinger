@@ -25,7 +25,7 @@ export default function LegalScreen() {
   return (
     <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace('/settings'))}>
           <ThemedText style={dynamicStyles.headerText}>{heading}</ThemedText>
         </TouchableOpacity>
         <ThemedText style={styles.body}>{body}</ThemedText>

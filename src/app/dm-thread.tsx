@@ -155,7 +155,7 @@ export default function DmThreadScreen() {
   return (
     <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.topRow}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace('/messages'))}>
           <ThemedText style={dynamicStyles.headerText}>‹ back</ThemedText>
         </TouchableOpacity>
         <TouchableOpacity style={styles.headerCenter} onPress={() => otherUserId && router.push(`/user?id=${otherUserId}`)}>

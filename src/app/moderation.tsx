@@ -97,7 +97,7 @@ export default function ModerationScreen() {
   return (
     <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace('/settings'))}>
           <ThemedText style={dynamicStyles.headerText}>‹ reports</ThemedText>
         </TouchableOpacity>
 

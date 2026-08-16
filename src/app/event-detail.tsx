@@ -287,7 +287,7 @@ export default function EventDetailScreen() {
     return (
       <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right']}>
         <View style={styles.content}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}>
             <ThemedText style={dynamicStyles.headerText}>‹ back</ThemedText>
           </TouchableOpacity>
           <ThemedText style={styles.noteText} themeColor="textSecondary">Event not found.</ThemedText>
@@ -300,7 +300,7 @@ export default function EventDetailScreen() {
     <SafeAreaView style={dynamicStyles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.topRow}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} style={styles.backBtn}>
             <ThemedText style={dynamicStyles.headerText}>‹ back</ThemedText>
           </TouchableOpacity>
 
