@@ -192,14 +192,14 @@ export default function OnboardingScreen() {
 
         <ThemedText style={styles.label} themeColor="accentCyan">School</ThemedText>
         <ThemedText style={styles.hint} themeColor="textSecondary">So classmates can find their people. All optional.</ThemedText>
-        <TextField label="University" placeholder="UC Santa Cruz" value={university} onChangeText={setUniversity} />
+        <TextField label="University" value={university} onChangeText={setUniversity} />
         <View style={styles.row2}>
-          <TextField containerStyle={styles.flex1} label="Grad year" placeholder="2027" keyboardType="number-pad" value={gradYear} onChangeText={setGradYear} />
-          <TextField containerStyle={styles.flex1} label="Cohort" placeholder="Transfer '24" value={cohort} onChangeText={setCohort} />
+          <TextField containerStyle={styles.flex1} label="Grad year" keyboardType="number-pad" value={gradYear} onChangeText={setGradYear} />
+          <TextField containerStyle={styles.flex1} label="Cohort" value={cohort} onChangeText={setCohort} />
         </View>
         <View style={styles.row2}>
-          <TextField containerStyle={styles.flex1} label="Major" placeholder="Computer Science" value={major} onChangeText={setMajor} />
-          <TextField containerStyle={styles.flex1} label="Minor" placeholder="Music" value={minor} onChangeText={setMinor} />
+          <TextField containerStyle={styles.flex1} label="Major" value={major} onChangeText={setMajor} />
+          <TextField containerStyle={styles.flex1} label="Minor" value={minor} onChangeText={setMinor} />
         </View>
 
         <ThemedText style={styles.label} themeColor="accentCyan">What are you into?</ThemedText>
