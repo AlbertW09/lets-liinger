@@ -1,20 +1,27 @@
 import { supabase } from '../supabaseClient';
 
-// Avatar picking + cropping. This is a self-contained DOM implementation for
-// web (the app's current target): it appends its own overlays to <body>, the
-// same approach the old file-input picker used. On native these functions
-// no-op (guarded on `document`); a native build would swap in expo-image-picker.
+// Image picking + cropping. Self-contained DOM implementation for web (the
+// app's current target): it appends its own overlays to <body>, the same
+// approach the old file-input picker used. On native these functions no-op
+// (guarded on `document`); a native build would swap in expo-image-picker.
 
-const OUTPUT_SIZE = 512; // final square avatar, in px
+const AVATAR_OUTPUT = 512;   // square avatar, px
+const COVER_OUTPUT = 1280;   // event cover width, px
 
 export type AvatarSource = 'library' | 'camera';
 
-// Entry point used by the profile screens: pick (or shoot) an image, then crop.
-export async function pickAndCropAvatar(source: AvatarSource): Promise<File | null> {
+// Generic entry point: pick (or shoot) an image, then crop to `aspect`
+// (width / height). aspect = 1 → square; ~1.78 → 16:9 cover.
+export async function pickAndCropImage(source: AvatarSource, aspect = 1): Promise<File | null> {
   if (typeof document === 'undefined') return null;
   const file = source === 'camera' ? await capturePhoto() : await selectImageFile();
   if (!file) return null;
-  return cropToSquare(file);
+  return cropToAspect(file, aspect);
+}
+
+// Square avatar (back-compat helper).
+export function pickAndCropAvatar(source: AvatarSource): Promise<File | null> {
+  return pickAndCropImage(source, 1);
 }
 
 // --- 1. Choose an image from the device ----------------------------------
@@ -29,7 +36,7 @@ function selectImageFile(): Promise<File | null> {
 }
 
 // --- 2. Take a photo with the webcam (getUserMedia) ----------------------
-// Falls back to a file input with `capture` (mobile) if the camera can't open.
+// Returns the full frame; framing is done in the crop step.
 async function capturePhoto(): Promise<File | null> {
   const nav = typeof navigator !== 'undefined' ? navigator : undefined;
   if (!nav?.mediaDevices?.getUserMedia) return selectImageFile();
@@ -68,42 +75,37 @@ async function capturePhoto(): Promise<File | null> {
     cancel.onclick = () => { cleanup(); resolve(null); };
     shoot.onclick = () => {
       const canvas = document.createElement('canvas');
-      const size = Math.min(video.videoWidth, video.videoHeight) || OUTPUT_SIZE;
-      canvas.width = size; canvas.height = size;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        const sx = (video.videoWidth - size) / 2;
-        const sy = (video.videoHeight - size) / 2;
-        ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
-      }
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 640;
+      canvas.getContext('2d')?.drawImage(video, 0, 0);
       cleanup();
       canvas.toBlob((blob) => {
         resolve(blob ? new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' }) : null);
-      }, 'image/jpeg', 0.9);
+      }, 'image/jpeg', 0.92);
     };
   });
 }
 
-// --- 3. Pan/zoom square cropper ------------------------------------------
-function cropToSquare(file: File): Promise<File | null> {
+// --- 3. Pan/zoom cropper (arbitrary aspect ratio) ------------------------
+function cropToAspect(file: File, aspect: number): Promise<File | null> {
   return new Promise<File | null>((resolve) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
       const { overlay, panel } = makeOverlay();
-      const V = Math.min(window.innerWidth * 0.85, 340); // viewport size (px)
+      const vw = Math.min(window.innerWidth * 0.85, 360); // viewport width
+      const vh = vw / aspect;                              // viewport height
 
       const nw = img.naturalWidth, nh = img.naturalHeight;
-      let scale = V / Math.min(nw, nh); // "cover" the square
+      let scale = Math.max(vw / nw, vh / nh); // "cover" the crop window
       const minScale = scale;
-      let tx = (V - nw * scale) / 2;
-      let ty = (V - nh * scale) / 2;
+      let tx = (vw - nw * scale) / 2;
+      let ty = (vh - nh * scale) / 2;
 
       const viewport = document.createElement('div');
       Object.assign(viewport.style, {
-        width: `${V}px`, height: `${V}px`, overflow: 'hidden', position: 'relative',
-        borderRadius: '16px', border: '2px solid #fff', touchAction: 'none', cursor: 'grab',
-        background: '#000',
+        width: `${vw}px`, height: `${vh}px`, overflow: 'hidden', position: 'relative',
+        borderRadius: '16px', border: '2px solid #fff', touchAction: 'none', cursor: 'grab', background: '#000',
       });
       const el = document.createElement('img');
       el.src = url;
@@ -114,8 +116,8 @@ function cropToSquare(file: File): Promise<File | null> {
 
       function clamp() {
         const dispW = nw * scale, dispH = nh * scale;
-        tx = Math.min(0, Math.max(V - dispW, tx));
-        ty = Math.min(0, Math.max(V - dispH, ty));
+        tx = Math.min(0, Math.max(vw - dispW, tx));
+        ty = Math.min(0, Math.max(vh - dispH, ty));
       }
       function paint() {
         el.style.width = `${nw * scale}px`;
@@ -125,7 +127,6 @@ function cropToSquare(file: File): Promise<File | null> {
       }
       clamp(); paint();
 
-      // Drag to pan.
       let dragging = false, lastX = 0, lastY = 0;
       viewport.onpointerdown = (e) => {
         dragging = true; lastX = e.clientX; lastY = e.clientY;
@@ -141,15 +142,14 @@ function cropToSquare(file: File): Promise<File | null> {
         dragging = false; viewport.releasePointerCapture(e.pointerId); viewport.style.cursor = 'grab';
       };
 
-      // Slider to zoom (keeps the viewport centre fixed).
       const slider = document.createElement('input');
       slider.type = 'range';
       slider.min = '1'; slider.max = '4'; slider.step = '0.01'; slider.value = '1';
-      Object.assign(slider.style, { width: `${V}px`, marginTop: '14px', accentColor: '#FF007F' });
+      Object.assign(slider.style, { width: `${vw}px`, marginTop: '14px', accentColor: '#FF007F' });
       slider.oninput = () => {
-        const cx = (V / 2 - tx) / scale, cy = (V / 2 - ty) / scale; // image point at centre
+        const cx = (vw / 2 - tx) / scale, cy = (vh / 2 - ty) / scale;
         scale = minScale * parseFloat(slider.value);
-        tx = V / 2 - cx * scale; ty = V / 2 - cy * scale;
+        tx = vw / 2 - cx * scale; ty = vh / 2 - cy * scale;
         clamp(); paint();
       };
       panel.appendChild(slider);
@@ -168,16 +168,20 @@ function cropToSquare(file: File): Promise<File | null> {
       function cleanup() { URL.revokeObjectURL(url); overlay.remove(); }
       cancel.onclick = () => { cleanup(); resolve(null); };
       save.onclick = () => {
+        const outW = aspect >= 1 ? COVER_OUTPUT : AVATAR_OUTPUT;
+        const outputW = aspect === 1 ? AVATAR_OUTPUT : outW;
+        const outputH = Math.round(outputW / aspect);
         const canvas = document.createElement('canvas');
-        canvas.width = OUTPUT_SIZE; canvas.height = OUTPUT_SIZE;
+        canvas.width = outputW; canvas.height = outputH;
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          const srcX = -tx / scale, srcY = -ty / scale, srcSize = V / scale;
-          ctx.drawImage(img, srcX, srcY, srcSize, srcSize, 0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
+          const srcX = -tx / scale, srcY = -ty / scale;
+          const srcW = vw / scale, srcH = vh / scale;
+          ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, outputW, outputH);
         }
         cleanup();
         canvas.toBlob((blob) => {
-          resolve(blob ? new File([blob], `avatar_${Date.now()}.jpg`, { type: 'image/jpeg' }) : null);
+          resolve(blob ? new File([blob], `img_${Date.now()}.jpg`, { type: 'image/jpeg' }) : null);
         }, 'image/jpeg', 0.9);
       };
     };
@@ -211,21 +215,28 @@ function makeButton(label: string, primary: boolean) {
   btn.textContent = label;
   Object.assign(btn.style, {
     padding: '10px 22px', borderRadius: '12px', fontWeight: '800', fontSize: '14px',
-    cursor: 'pointer', border: '2px solid #000',
-    fontFamily: 'system-ui, sans-serif',
+    cursor: 'pointer', border: '2px solid #000', fontFamily: 'system-ui, sans-serif',
     background: primary ? '#39FF14' : '#fff', color: '#000',
   });
   return btn;
 }
 
-// Uploads to the public `avatars` bucket under the user's folder and returns a public URL.
-export async function uploadAvatar(userId: string, file: File): Promise<string | null> {
-  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-  const path = `${userId}/avatar_${Date.now()}.${ext}`;
+// --- Uploads --------------------------------------------------------------
+async function uploadImage(bucket: string, path: string, file: File): Promise<string | null> {
   const { error } = await supabase.storage
-    .from('avatars')
+    .from(bucket)
     .upload(path, file, { upsert: true, contentType: file.type || 'image/jpeg' });
   if (error) return null;
-  const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
+}
+
+export async function uploadAvatar(userId: string, file: File): Promise<string | null> {
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  return uploadImage('avatars', `${userId}/avatar_${Date.now()}.${ext}`, file);
+}
+
+export async function uploadEventCover(userId: string, file: File): Promise<string | null> {
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  return uploadImage('event-covers', `${userId}/cover_${Date.now()}.${ext}`, file);
 }

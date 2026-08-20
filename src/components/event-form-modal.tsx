@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AvatarSourceModal } from '@/components/avatar-source-modal';
 import { DateTimeField } from '@/components/date-time-field';
 import { PlaceSearchField } from '@/components/place-search-field';
 import { ThemedText } from '@/components/themed-text';
@@ -13,10 +14,14 @@ import { useClubs } from '@/hooks/use-clubs';
 import { usePlaceSearch } from '@/hooks/use-place-search';
 import { useUserCoords } from '@/hooks/use-user-coords';
 import { useTheme } from '@/hooks/use-theme';
+import { AvatarSource, pickAndCropImage, uploadEventCover } from '@/lib/avatar';
+import { EVENT_CATEGORIES } from '@/lib/categories';
 import { clubLabel } from '@/lib/clubs';
 import { PlaceResult } from '@/lib/places';
 import { checkClean } from '@/lib/profanity';
 import { supabase } from '../supabaseClient';
+
+const COVER_ASPECT = 16 / 9;
 
 export interface EventFormInitialValues {
   title: string;
@@ -26,6 +31,8 @@ export interface EventFormInitialValues {
   eventTime: string | null;
   latitude: number | null;
   longitude: number | null;
+  coverUrl?: string | null;
+  category?: string | null;
 }
 
 export interface EventFormSubmitValues {
@@ -34,6 +41,8 @@ export interface EventFormSubmitValues {
   host: string;
   place: PlaceResult;
   eventTimeIso: string;
+  coverUrl: string | null;
+  category: string | null;
 }
 
 interface EventFormModalProps {
@@ -87,8 +96,24 @@ export function EventFormModal({ visible, mode, initialValues, onClose, onSubmit
   const [date, setDate] = useState<Date | null>(null);
   const [time, setTime] = useState<Date | null>(null);
   const [myClubs, setMyClubs] = useState<string[]>([]);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [category, setCategory] = useState<string | null>(null);
+  const [coverMenuVisible, setCoverMenuVisible] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+
+  async function handlePickCover(source: AvatarSource) {
+    setCoverMenuVisible(false);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const file = await pickAndCropImage(source, COVER_ASPECT);
+    if (!file) return;
+    setUploadingCover(true);
+    const url = await uploadEventCover(user.id, file);
+    setUploadingCover(false);
+    if (url) setCoverUrl(url);
+  }
 
   // Re-seed every time the modal opens: blank for "create", the event's
   // current values for "edit".
@@ -99,6 +124,8 @@ export function EventFormModal({ visible, mode, initialValues, onClose, onSubmit
     setHost(initialValues?.host ?? '');
     setDate(parseInitialDate(initialValues));
     setTime(parseInitialTime(initialValues));
+    setCoverUrl(initialValues?.coverUrl ?? null);
+    setCategory(initialValues?.category ?? null);
     setFormError('');
     place.reset(parseInitialPlace(initialValues));
     // Pull the clubs the user belongs to (from their profile) so they show up
@@ -141,6 +168,8 @@ export function EventFormModal({ visible, mode, initialValues, onClose, onSubmit
       host: host.trim(),
       place: place.selected,
       eventTimeIso: toEventTimeIso(date, time),
+      coverUrl,
+      category,
     });
     setSaving(false);
 
@@ -169,7 +198,42 @@ export function EventFormModal({ visible, mode, initialValues, onClose, onSubmit
             <View style={styles.spacer} />
           </View>
 
+          <ThemedText style={styles.label} themeColor="accentCyan">Cover photo (optional)</ThemedText>
+          <TouchableOpacity
+            style={[styles.coverBox, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}
+            onPress={() => setCoverMenuVisible(true)}
+            activeOpacity={0.85}
+          >
+            {uploadingCover ? (
+              <ActivityIndicator color={theme.text} />
+            ) : coverUrl ? (
+              <Image source={{ uri: coverUrl }} style={styles.coverImg} resizeMode="cover" />
+            ) : (
+              <ThemedText style={styles.coverHint} themeColor="textSecondary">＋ Add a cover photo</ThemedText>
+            )}
+          </TouchableOpacity>
+
           <TextField label="Title" value={title} onChangeText={setTitle} />
+
+          <ThemedText style={styles.label} themeColor="accentCyan">Category</ThemedText>
+          <View style={styles.clubSuggest}>
+            {EVENT_CATEGORIES.map((c) => {
+              const selected = category === c.key;
+              return (
+                <TouchableOpacity
+                  key={c.key}
+                  onPress={() => setCategory(selected ? null : c.key)}
+                  style={[
+                    styles.catChip,
+                    { borderColor: theme.border, backgroundColor: selected ? c.color : theme.backgroundElement },
+                  ]}
+                >
+                  <View style={[styles.catDot, { backgroundColor: c.color, borderColor: theme.border }]} />
+                  <ThemedText style={[styles.catChipText, selected && { color: '#000' }]}>{c.label}</ThemedText>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
           <TextField
             label="Description"
             placeholder="What's the vibe?"
@@ -219,6 +283,12 @@ export function EventFormModal({ visible, mode, initialValues, onClose, onSubmit
             </ThemedText>
           </ShadowSurface>
         </ScrollView>
+
+        <AvatarSourceModal
+          visible={coverMenuVisible}
+          onClose={() => setCoverMenuVisible(false)}
+          onPick={handlePickCover}
+        />
       </SafeAreaView>
     </Modal>
   );
@@ -235,6 +305,18 @@ const styles = StyleSheet.create({
   spacer: { width: 50 },
   multiline: { height: 80, textAlignVertical: 'top' },
   clubSuggest: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, marginBottom: Spacing.two },
+  coverBox: {
+    width: '100%', aspectRatio: 16 / 9, borderWidth: 2, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: Spacing.two,
+  },
+  coverImg: { width: '100%', height: '100%' },
+  coverHint: { fontSize: 14, fontWeight: '800' },
+  catChip: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.one,
+    borderWidth: 2, borderRadius: 999, paddingHorizontal: Spacing.two, paddingVertical: 5,
+  },
+  catDot: { width: 10, height: 10, borderRadius: 5, borderWidth: 1 },
+  catChipText: { fontSize: 12, fontWeight: '800' },
   label: {
     fontSize: 12, fontWeight: '900', marginBottom: Spacing.two, marginTop: Spacing.three, letterSpacing: 0.5,
   },

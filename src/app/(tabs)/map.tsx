@@ -16,6 +16,7 @@ import {
   DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM, FIT_BOUNDS_OPTS,
   OSM_ATTRIBUTION, OSM_MAX_ZOOM, OSM_TILE_URL, SINGLE_POINT_ZOOM,
 } from '@/lib/map-config';
+import { EVENT_CATEGORIES } from '@/lib/categories';
 import { buildMarkerPayload, MapMarker, PinEvent } from '@/lib/map-markers';
 import { supabase } from '../../supabaseClient';
 
@@ -92,7 +93,7 @@ export default function MapScreen() {
     const [eventsRes, rsvpsRes] = await Promise.all([
       supabase
         .from('events')
-        .select('id, title, location, event_time, latitude, longitude, host, creator:profiles!events_created_by_fkey(username, display_name)'),
+        .select('id, title, location, event_time, latitude, longitude, host, category, creator:profiles!events_created_by_fkey(username, display_name)'),
       supabase.from('rsvps').select('event_id, user_id'),
     ]);
 
@@ -127,6 +128,7 @@ export default function MapScreen() {
           ? e.host
           : e.creator?.username ? `@${e.creator.username}` : e.creator?.display_name ?? 'Someone',
         rsvpedByMe: !!user && rsvps.some((r) => r.event_id === e.id && r.user_id === user.id),
+        category: e.category ?? null,
       }))
     );
     setLoading(false);
@@ -326,17 +328,19 @@ export default function MapScreen() {
 
         <View style={styles.legendRow}>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: colors.accentPink, borderColor: colors.border }]} />
-            <ThemedText style={styles.legendText}>Event</ThemedText>
-          </View>
-          <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: colors.accentGreen, borderColor: colors.border }]} />
-            <ThemedText style={styles.legendText}>You're going</ThemedText>
+            <ThemedText style={styles.legendText}>Going</ThemedText>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: colors.accentCyan, borderColor: colors.border }]} />
-            <ThemedText style={styles.legendText}>You are here</ThemedText>
+            <ThemedText style={styles.legendText}>You</ThemedText>
           </View>
+          {EVENT_CATEGORIES.map((c) => (
+            <View key={c.key} style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: c.color, borderColor: colors.border }]} />
+              <ThemedText style={styles.legendText}>{c.label}</ThemedText>
+            </View>
+          ))}
         </View>
 
         {!userCoords && (

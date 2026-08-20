@@ -17,6 +17,7 @@ function pin(overrides: Partial<PinEvent> = {}): PinEvent {
     lng: 2,
     hostName: 'Someone',
     rsvpedByMe: false,
+    category: null,
     ...overrides,
   };
 }
@@ -30,14 +31,17 @@ describe('buildMarkerPayload', () => {
     expect(markers[0].isUser).toBeFalsy();
   });
 
-  it('always uses accentPink for non-RSVP\'d pins, regardless of position', () => {
-    const pins = [pin({ id: '1' }), pin({ id: '2' }), pin({ id: '3' })];
-    const markers = buildMarkerPayload(pins, null, colors);
+  it('colors non-RSVP\'d pins by category (music = pink, sports = its color)', () => {
+    const [music] = buildMarkerPayload([pin({ category: 'music' })], null, colors);
+    expect(music.iconHtml).toContain('#FF007F'); // music color from categories
 
-    markers.forEach((m) => {
-      expect(m.iconHtml).toContain(colors.accentPink);
-      expect(m.iconHtml).not.toContain(colors.accentCyan);
-    });
+    const [sports] = buildMarkerPayload([pin({ category: 'sports' })], null, colors);
+    expect(sports.iconHtml).toContain('#00B4FF'); // sports color
+
+    // No category → neutral grey fallback, never the "you are here" cyan.
+    const [none] = buildMarkerPayload([pin({ category: null })], null, colors);
+    expect(none.iconHtml).toContain('#9CA3AF');
+    expect(none.iconHtml).not.toContain(colors.accentCyan);
   });
 
   it('always uses accentGreen and a checkmark for RSVP\'d pins', () => {

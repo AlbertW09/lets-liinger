@@ -1,3 +1,4 @@
+import { categoryColor } from './categories';
 import type { Coords } from '@/lib/places';
 
 export interface PinEvent {
@@ -9,6 +10,7 @@ export interface PinEvent {
   lng: number;
   hostName: string;
   rsvpedByMe: boolean;
+  category: string | null;
 }
 
 export interface MapPinColors {
@@ -52,7 +54,9 @@ export function buildMarkerPayload(
   colors: MapPinColors
 ): MapMarker[] {
   const markers: MapMarker[] = pins.map((pin) => {
-    const bg = pin.rsvpedByMe ? colors.accentGreen : colors.accentPink;
+    // RSVP'd pins are green with a check; everything else is colored by its
+    // category so the map reads as a legend of event types.
+    const bg = pin.rsvpedByMe ? colors.accentGreen : categoryColor(pin.category);
     const glyph = pin.rsvpedByMe ? '✓' : '📍';
     return {
       id: pin.id,

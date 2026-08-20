@@ -2,6 +2,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -10,7 +11,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EmptyState } from '@/components/empty-state';
 import { EventFormModal, EventFormSubmitValues } from '@/components/event-form-modal';
+import { EventCardSkeleton } from '@/components/skeleton';
 import { ThemedText } from '@/components/themed-text';
 import { Chip } from '@/components/ui/chip';
 import { IconButton } from '@/components/ui/icon-button';
@@ -19,6 +22,7 @@ import { Spacing } from '@/constants/theme';
 import { useNotifications } from '@/hooks/notifications-context';
 import { useTheme } from '@/hooks/use-theme';
 import { useUserCoords } from '@/hooks/use-user-coords';
+import { EVENT_CATEGORIES, categoryColor, categoryLabel } from '@/lib/categories';
 import { getFollowingIds, getUnreadFollowerCount } from '../../lib/follows';
 import { getBlockedIds } from '../../lib/moderation';
 import type { Coords } from '../../lib/places';
@@ -50,6 +54,8 @@ interface EnrichedEvent {
   rsvpers: string[];
   rsvpedByMe: boolean;
   distance: number | null;
+  coverUrl: string | null;
+  category: string | null;
 }
 
 // "Posted 3h ago" style relative label.
@@ -112,6 +118,7 @@ export default function HomeScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('upcoming');
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [followingOnly, setFollowingOnly] = useState(false);
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
   const [unreadNotifs, setUnreadNotifs] = useState(0);
@@ -130,7 +137,7 @@ export default function HomeScreen() {
     let eventsQuery = supabase
       .from('events')
       .select(
-        'id, title, description, location, event_time, latitude, longitude, created_at, host, created_by, creator:profiles!events_created_by_fkey(username, display_name)',
+        'id, title, description, location, event_time, latitude, longitude, created_at, host, created_by, cover_url, category, creator:profiles!events_created_by_fkey(username, display_name)',
         { count: 'exact' }
       )
       .order('created_at', { ascending: false })
@@ -201,6 +208,8 @@ export default function HomeScreen() {
           hasCoords && userCoords
             ? distanceKm(userCoords, { lat: e.latitude, lng: e.longitude })
             : null,
+        coverUrl: e.cover_url ?? null,
+        category: e.category ?? null,
       };
     });
 
@@ -283,6 +292,8 @@ export default function HomeScreen() {
       host: values.host || null,
       latitude: values.place.lat,
       longitude: values.place.lng,
+      cover_url: values.coverUrl,
+      category: values.category,
     });
 
     if (error) return { error: error.message };
@@ -296,6 +307,7 @@ export default function HomeScreen() {
   // Filter + sort for display
   const visibleEvents = events
     .filter((e) => (followingOnly ? !!e.createdBy && followingIds.has(e.createdBy) : true))
+    .filter((e) => (categoryFilter ? e.category === categoryFilter : true))
     .filter((e) => {
       const q = searchQuery.trim().toLowerCase();
       if (!q) return true;
@@ -439,11 +451,32 @@ export default function HomeScreen() {
           />
         </ScrollView>
 
-        {followingOnly && visibleEvents.length === 0 && !loading && (
-          <ThemedText style={styles.noteText} themeColor="textSecondary">
-            No events from people you follow yet. Follow classmates to fill this up!
-          </ThemedText>
-        )}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.sortRowScroll}
+          contentContainerStyle={styles.sortRow}
+        >
+          <TouchableOpacity
+            onPress={() => setCategoryFilter(null)}
+            style={[styles.catFilterChip, { borderColor: colors.border, backgroundColor: categoryFilter === null ? colors.accentPink : 'transparent' }]}
+          >
+            <ThemedText style={styles.catFilterText}>All</ThemedText>
+          </TouchableOpacity>
+          {EVENT_CATEGORIES.map((c) => {
+            const on = categoryFilter === c.key;
+            return (
+              <TouchableOpacity
+                key={c.key}
+                onPress={() => setCategoryFilter(on ? null : c.key)}
+                style={[styles.catFilterChip, { borderColor: colors.border, backgroundColor: on ? c.color : 'transparent' }]}
+              >
+                <View style={[styles.catFilterDot, { backgroundColor: c.color, borderColor: colors.border }]} />
+                <ThemedText style={[styles.catFilterText, on && { color: '#000' }]}>{c.label}</ThemedText>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
 
         {sortMode === 'nearby' && !userCoords && (
           <ThemedText style={styles.noteText} themeColor="textSecondary">
@@ -452,13 +485,27 @@ export default function HomeScreen() {
         )}
 
         {loading ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color={colors.text} />
+          <View>
+            <EventCardSkeleton />
+            <EventCardSkeleton />
+            <EventCardSkeleton />
           </View>
         ) : visibleEvents.length === 0 ? (
-          <ThemedText style={styles.noteText} themeColor="textSecondary">
-            No events yet. Tap “+ CREATE EVENT” to add the first one!
-          </ThemedText>
+          <EmptyState
+            emoji={categoryFilter || followingOnly ? '🔍' : '📅'}
+            title={
+              categoryFilter
+                ? 'No events in this category'
+                : followingOnly
+                  ? 'No events from people you follow'
+                  : 'No events yet'
+            }
+            subtitle={
+              followingOnly
+                ? 'Follow classmates to see their events here.'
+                : 'Tap “+ CREATE EVENT” to add the first one!'
+            }
+          />
         ) : (
           visibleEvents.map((event) => (
             <ShadowSurface
@@ -470,6 +517,14 @@ export default function HomeScreen() {
               style={styles.card}
               onPress={() => router.push(`/event-detail?id=${event.id}`)}
             >
+              {event.coverUrl ? (
+                <Image source={{ uri: event.coverUrl }} style={styles.cardCover} resizeMode="cover" />
+              ) : null}
+              {categoryLabel(event.category) ? (
+                <View style={[styles.cardCategory, { backgroundColor: categoryColor(event.category), borderColor: colors.border }]}>
+                  <ThemedText style={styles.cardCategoryText}>{categoryLabel(event.category)}</ThemedText>
+                </View>
+              ) : null}
               <ThemedText style={styles.eventTitle}>{event.title}</ThemedText>
 
               <View style={styles.metaRow}>
@@ -594,6 +649,12 @@ function rsvpSummary(usernames: string[], count: number): string {
 const styles = StyleSheet.create({
   scrollContent: { padding: Spacing.four, paddingBottom: 130 },
   loadingWrap: { paddingVertical: Spacing.six, alignItems: 'center' },
+  cardCover: { width: '100%', aspectRatio: 16 / 9, borderRadius: 12, marginBottom: Spacing.two },
+  cardCategory: { alignSelf: 'flex-start', borderWidth: 2, borderRadius: 999, paddingHorizontal: Spacing.two, paddingVertical: 2, marginBottom: Spacing.one },
+  cardCategoryText: { fontSize: 10, fontWeight: '900', color: '#000' },
+  catFilterChip: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one, borderWidth: 2, borderRadius: 999, paddingHorizontal: Spacing.two, paddingVertical: 5 },
+  catFilterDot: { width: 10, height: 10, borderRadius: 5, borderWidth: 1 },
+  catFilterText: { fontSize: 12, fontWeight: '800' },
   header: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', marginBottom: Spacing.two,

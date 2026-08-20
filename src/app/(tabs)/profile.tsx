@@ -47,6 +47,12 @@ export default function ProfileScreen() {
     host: string;
     location: string;
   }[]>([]);
+  const [bookmarked, setBookmarked] = useState<{
+    id: string;
+    title: string;
+    host: string;
+    location: string;
+  }[]>([]);
   const [selfId, setSelfId] = useState<string | null>(null);
   const [followCounts, setFollowCounts] = useState({ followers: 0, following: 0 });
   const { clubs, create: createClub } = useClubs();
@@ -94,7 +100,8 @@ export default function ProfileScreen() {
         setSelfId(user.id);
         getFollowCounts(user.id).then((c) => { if (!cancelled) setFollowCounts(c); });
 
-        const [profileRes, rsvpRes] = await Promise.all([
+        const eventShape = 'event:events!{fk}(id, title, location, creator:profiles!events_created_by_fkey(username, display_name))';
+        const [profileRes, rsvpRes, savedRes] = await Promise.all([
           supabase
             .from('profiles')
             .select('display_name, username, bio, avatar_url, interests, extracurriculars, university, major, minor, grad_year, cohort')
@@ -102,7 +109,11 @@ export default function ProfileScreen() {
             .single(),
           supabase
             .from('rsvps')
-            .select('event:events!rsvps_event_id_fkey(id, title, location, creator:profiles!events_created_by_fkey(username, display_name))')
+            .select(eventShape.replace('{fk}', 'rsvps_event_id_fkey'))
+            .eq('user_id', user.id),
+          supabase
+            .from('event_saves')
+            .select(eventShape.replace('{fk}', 'event_saves_event_id_fkey'))
             .eq('user_id', user.id),
         ]);
 
@@ -112,16 +123,18 @@ export default function ProfileScreen() {
           setProfile(profileRes.data);
         }
 
-        const rsvped = (rsvpRes.data ?? [])
-          .map((r: any) => r.event)
-          .filter(Boolean)
-          .map((e: any) => ({
-            id: e.id,
-            title: e.title,
-            location: e.location ?? 'TBD',
-            host: e.creator?.username ? `@${e.creator.username}` : e.creator?.display_name ?? 'Someone',
-          }));
-        setSavedEvents(rsvped);
+        const toCards = (rows: any[]) =>
+          rows
+            .map((r: any) => r.event)
+            .filter(Boolean)
+            .map((e: any) => ({
+              id: e.id,
+              title: e.title,
+              location: e.location ?? 'TBD',
+              host: e.creator?.username ? `@${e.creator.username}` : e.creator?.display_name ?? 'Someone',
+            }));
+        setSavedEvents(toCards(rsvpRes.data ?? []));
+        setBookmarked(toCards(savedRes.data ?? []));
 
         setLoadingProfile(false);
       }
@@ -359,6 +372,30 @@ export default function ProfileScreen() {
             <ThemedText style={styles.eventMeta}>Hosted by {event.host} • {event.location}</ThemedText>
           </ShadowSurface>
         ))}
+
+        {bookmarked.length > 0 && (
+          <>
+            <View style={styles.sectionHeader}>
+              <ThemedText style={styles.sectionTitle}>SAVED</ThemedText>
+            </View>
+            {bookmarked.map((event) => (
+              <ShadowSurface
+                key={event.id}
+                backgroundColor={colors.backgroundElement}
+                radius={16}
+                offset={4}
+                borderWidth={2}
+                wrapperStyle={styles.eventCardShadow}
+                style={styles.eventCard}
+                onPress={() => router.push(`/event-detail?id=${event.id}`)}
+              >
+                <Badge label="★ SAVED" backgroundColor={colors.accentYellow} style={styles.statusBadge} />
+                <ThemedText style={styles.eventTitle}>{event.title}</ThemedText>
+                <ThemedText style={styles.eventMeta}>Hosted by {event.host} • {event.location}</ThemedText>
+              </ShadowSurface>
+            ))}
+          </>
+        )}
 
       </ScrollView>
     </SafeAreaView>

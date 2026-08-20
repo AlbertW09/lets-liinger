@@ -138,6 +138,28 @@ export function subscribeToMyMessages(myUserId: string, onInsert: (row: DirectMe
   };
 }
 
+// Realtime UPDATEs to my messages (e.g. the other person liking one). Returns
+// an unsubscribe function. Pairs with subscribeToMyMessages (which is INSERTs).
+export function subscribeToMyMessageUpdates(myUserId: string, onUpdate: (row: DirectMessage) => void): () => void {
+  const channel = supabase
+    .channel(`dm-upd-${myUserId}-${Math.random().toString(36).slice(2)}`)
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'direct_messages', filter: `recipient_id=eq.${myUserId}` },
+      (payload) => onUpdate(payload.new as DirectMessage)
+    )
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'direct_messages', filter: `sender_id=eq.${myUserId}` },
+      (payload) => onUpdate(payload.new as DirectMessage)
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
 export function profileLabel(p: ProfileLite | null | undefined): string {
   if (!p) return 'Someone';
   return p.username ? `@${p.username}` : p.display_name ?? 'Someone';

@@ -14,6 +14,7 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [recovering, setRecovering] = useState(false);
   const router = useRouter();
   const segments = useSegments();
 
@@ -24,12 +25,22 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
+      // A password-recovery link establishes a temporary session; route the
+      // user to set a new password instead of into the app.
+      if (event === 'PASSWORD_RECOVERY') setRecovering(true);
+      if (event === 'SIGNED_OUT') setRecovering(false);
       setSession(newSession);
     });
 
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  // While recovering, keep the user on the reset-password screen.
+  useEffect(() => {
+    // Cast: typed-routes regenerates to include this new route on next start.
+    if (recovering) router.replace('/reset-password' as never);
+  }, [recovering, router]);
 
   usePushNotificationRouting();
 
@@ -39,6 +50,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (loading) return;
+    if (recovering) return; // password-recovery flow owns navigation
 
     const seg = segments[0];
     const onboarded = !!session?.user?.user_metadata?.onboarded;
@@ -54,7 +66,7 @@ export default function RootLayout() {
       // valid destination and shouldn't be force-redirected to /(tabs).
       router.replace('/(tabs)');
     }
-  }, [session, loading, segments]);
+  }, [session, loading, segments, recovering]);
 
   if (loading) {
     return (

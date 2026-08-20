@@ -22,6 +22,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    // Process auth tokens that arrive in the URL (email confirmation +
+    // password-recovery links) in the browser; skip during SSR where there's
+    // no window/URL to read.
+    detectSessionInUrl: !isServer,
   },
 });

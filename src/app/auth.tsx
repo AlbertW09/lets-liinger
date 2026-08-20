@@ -79,6 +79,22 @@ export default function AuthScreen() {
     setLoading(false);
   }
 
+  async function handleForgotPassword() {
+    setErrorMsg('');
+    setInfoMsg('');
+    if (!email.trim()) {
+      setErrorMsg('Enter your email above first, then tap “Forgot password”.');
+      return;
+    }
+    const redirectTo =
+      typeof window !== 'undefined' && window.location?.origin
+        ? `${window.location.origin}/reset-password`
+        : undefined;
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+    if (error) setErrorMsg(error.message);
+    else setInfoMsg('Password reset link sent — check your email.');
+  }
+
   const legalText = legalDoc === 'privacy' ? PRIVACY_TEXT : TERMS_TEXT;
 
   return (
@@ -95,6 +111,10 @@ export default function AuthScreen() {
 
           <TextField label="Email" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" value={email} onChangeText={setEmail} />
           <TextField label="Password" secureTextEntry value={password} onChangeText={setPassword} />
+
+          <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotRow}>
+            <ThemedText style={[styles.forgot, { color: colors.accentCyan }]}>Forgot password?</ThemedText>
+          </TouchableOpacity>
 
           {/* Age gate + Terms — required for account creation */}
           <View style={styles.checksWrap}>
@@ -206,6 +226,8 @@ const styles = StyleSheet.create({
     fontSize: 40, letterSpacing: -1, textAlign: 'center',
   },
   subtitle: { textAlign: 'center', marginTop: Spacing.two, marginBottom: Spacing.six },
+  forgotRow: { alignSelf: 'flex-end', marginTop: Spacing.two },
+  forgot: { fontSize: 13, fontWeight: '800' },
   checksWrap: { marginTop: Spacing.four, gap: Spacing.two },
   checkRow: { flexDirection: 'row', alignItems: 'flex-start' },
   checkbox: {

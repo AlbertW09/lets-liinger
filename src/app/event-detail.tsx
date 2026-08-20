@@ -1,7 +1,7 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View,
+  ActivityIndicator, Image, Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,6 +9,8 @@ import { AvatarBubble } from '@/components/avatar-bubble';
 import { EventFormInitialValues, EventFormModal, EventFormSubmitValues } from '@/components/event-form-modal';
 import { ThemedText } from '@/components/themed-text';
 import { IconButton } from '@/components/ui/icon-button';
+import { categoryColor, categoryLabel } from '@/lib/categories';
+import { addToCalendar, saveEvent, shareEvent, unsaveEvent } from '../lib/events';
 import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -45,6 +47,8 @@ interface EventDetail {
   createdBy: string | null;
   latitude: number | null;
   longitude: number | null;
+  coverUrl: string | null;
+  category: string | null;
 }
 
 export default function EventDetailScreen() {
@@ -59,6 +63,8 @@ export default function EventDetailScreen() {
   const [likedByMe, setLikedByMe] = useState(false);
   const [rsvpers, setRsvpers] = useState<Attendee[]>([]);
   const [rsvpedByMe, setRsvpedByMe] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [shareMsg, setShareMsg] = useState('');
   const [friendsGoing, setFriendsGoing] = useState<string[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -82,7 +88,7 @@ export default function EventDetailScreen() {
     const [eventRes, likesRes, rsvpsRes, commentsRes] = await Promise.all([
       supabase
         .from('events')
-        .select('id, title, description, location, event_time, host, created_at, created_by, latitude, longitude, creator:profiles!events_created_by_fkey(username, display_name, avatar_url)')
+        .select('id, title, description, location, event_time, host, created_at, created_by, latitude, longitude, cover_url, category, creator:profiles!events_created_by_fkey(username, display_name, avatar_url)')
         .eq('id', id)
         .single(),
       supabase.from('event_likes').select('user_id').eq('event_id', id),
@@ -115,6 +121,8 @@ export default function EventDetailScreen() {
         createdBy: e.created_by ?? null,
         latitude: e.latitude ?? null,
         longitude: e.longitude ?? null,
+        coverUrl: e.cover_url ?? null,
+        category: e.category ?? null,
       });
     }
 
@@ -132,6 +140,15 @@ export default function EventDetailScreen() {
       .filter((r) => !!r.label);
     setRsvpers(attendees);
     setRsvpedByMe(!!user && rsvps.some((r) => r.user_id === user.id));
+
+    if (user) {
+      const { count } = await supabase
+        .from('event_saves')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('event_id', id);
+      setSaved((count ?? 0) > 0);
+    }
 
     // Which of the people I follow are going (social proof).
     if (user) {
@@ -169,6 +186,32 @@ export default function EventDetailScreen() {
       await supabase.from('rsvps').insert({ event_id: id, user_id: userId });
     }
     fetchAll();
+  }
+
+  async function toggleSave() {
+    if (!userId || !id) return;
+    const next = !saved;
+    setSaved(next); // optimistic
+    if (next) await saveEvent(userId, id);
+    else await unsaveEvent(userId, id);
+  }
+
+  async function handleAddToCalendar() {
+    if (!event) return;
+    const ok = await addToCalendar({
+      title: event.title,
+      details: event.description,
+      location: event.location,
+      eventTime: event.event_time,
+    });
+    if (!ok) { setShareMsg('This event has no date set yet.'); setTimeout(() => setShareMsg(''), 2500); }
+  }
+
+  async function handleShare() {
+    if (!event || !id) return;
+    const result = await shareEvent(id, event.title);
+    if (result === 'copied') { setShareMsg('Link copied to clipboard!'); setTimeout(() => setShareMsg(''), 2500); }
+    else if (result === 'unsupported') { setShareMsg('Sharing not available here.'); setTimeout(() => setShareMsg(''), 2500); }
   }
 
   async function toggleLike() {
@@ -211,6 +254,8 @@ export default function EventDetailScreen() {
         eventTime: event.event_time,
         latitude: event.latitude,
         longitude: event.longitude,
+        coverUrl: event.coverUrl,
+        category: event.category,
       }
     : undefined;
 
@@ -225,6 +270,8 @@ export default function EventDetailScreen() {
         host: values.host || null,
         latitude: values.place.lat,
         longitude: values.place.lng,
+        cover_url: values.coverUrl,
+        category: values.category,
       })
       .eq('id', id);
 
@@ -325,6 +372,14 @@ export default function EventDetailScreen() {
           wrapperStyle={styles.cardShadow}
           style={styles.card}
         >
+          {event.coverUrl ? (
+            <Image source={{ uri: event.coverUrl }} style={styles.cover} resizeMode="cover" />
+          ) : null}
+          {categoryLabel(event.category) ? (
+            <View style={[styles.categoryBadge, { backgroundColor: categoryColor(event.category), borderColor: colors.border }]}>
+              <ThemedText style={styles.categoryBadgeText}>{categoryLabel(event.category)}</ThemedText>
+            </View>
+          ) : null}
           <ThemedText style={styles.title}>{event.title}</ThemedText>
           <View style={styles.metaRow}>
             <ThemedText style={styles.metaLabel}>HOSTED BY:</ThemedText>
@@ -382,6 +437,30 @@ export default function EventDetailScreen() {
               <ThemedText style={styles.buttonText}>{likedByMe ? '💖' : '🤍'} {likeCount}</ThemedText>
             </TouchableOpacity>
           </View>
+
+          <View style={styles.secondaryRow}>
+            <TouchableOpacity
+              style={[styles.secondaryBtn, { borderColor: colors.border, backgroundColor: saved ? colors.accentYellow : 'transparent' }]}
+              onPress={toggleSave}
+            >
+              <ThemedText style={styles.secondaryText}>{saved ? '★ Saved' : '☆ Save'}</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.secondaryBtn, { borderColor: colors.border }]}
+              onPress={handleAddToCalendar}
+            >
+              <ThemedText style={styles.secondaryText}>Add to calendar</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.secondaryBtn, { borderColor: colors.border }]}
+              onPress={handleShare}
+            >
+              <ThemedText style={styles.secondaryText}>Share</ThemedText>
+            </TouchableOpacity>
+          </View>
+          {shareMsg ? (
+            <ThemedText style={styles.shareMsg} themeColor="accentCyan">{shareMsg}</ThemedText>
+          ) : null}
         </ShadowSurface>
 
         <ThemedText style={styles.sectionTitle}>WHO&apos;S GOING ({rsvpers.length})</ThemedText>
@@ -534,6 +613,9 @@ const styles = StyleSheet.create({
   ownerActions: { flexDirection: 'row', gap: Spacing.two },
   cardShadow: { marginBottom: Spacing.four },
   card: { padding: Spacing.four },
+  cover: { width: '100%', aspectRatio: 16 / 9, borderRadius: 12, marginBottom: Spacing.three },
+  categoryBadge: { alignSelf: 'flex-start', borderWidth: 2, borderRadius: 999, paddingHorizontal: Spacing.two, paddingVertical: 2, marginBottom: Spacing.one },
+  categoryBadgeText: { fontSize: 11, fontWeight: '900', color: '#000' },
   title: { fontSize: 24, fontWeight: '900', lineHeight: 28, marginBottom: Spacing.two },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one, marginBottom: Spacing.two },
   metaLabel: { fontSize: 11, fontWeight: 'bold', opacity: 0.6 },
@@ -546,6 +628,10 @@ const styles = StyleSheet.create({
   postedText: { fontSize: 12, fontWeight: '700', marginTop: Spacing.two },
   friendsGoing: { fontSize: 13, fontWeight: '900', marginTop: Spacing.two },
   actionsRow: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.three },
+  secondaryRow: { flexDirection: 'row', gap: Spacing.two, marginTop: Spacing.two },
+  secondaryBtn: { flex: 1, borderWidth: 2, borderRadius: 10, paddingVertical: Spacing.two, alignItems: 'center' },
+  secondaryText: { fontSize: 12, fontWeight: '800' },
+  shareMsg: { fontSize: 12, fontWeight: '800', marginTop: Spacing.two, textAlign: 'center' },
   buttonText: { fontWeight: '900', color: '#000', fontSize: 14 },
   commentError: { color: '#ff6b6b', fontWeight: '700', fontSize: 12, marginBottom: Spacing.two },
   sectionTitle: { fontWeight: '900', fontSize: 16, letterSpacing: 0.5, marginTop: Spacing.two, marginBottom: Spacing.two },

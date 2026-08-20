@@ -10,7 +10,7 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   DirectMessage, ProfileLite, fetchProfile, fetchThread, profileLabel,
-  sendDirectMessage, subscribeToMyMessages, toggleMessageLike,
+  sendDirectMessage, subscribeToMyMessages, subscribeToMyMessageUpdates, toggleMessageLike,
 } from '@/lib/messages';
 import { checkClean } from '../lib/profanity';
 import { supabase } from '../supabaseClient';
@@ -89,13 +89,18 @@ export default function DmThreadScreen() {
     useCallback(() => {
       fetchAll();
       if (!myUserId) return;
-      const unsubscribe = subscribeToMyMessages(myUserId, (row) => {
+      const unsubInsert = subscribeToMyMessages(myUserId, (row) => {
         if (row.sender_id !== otherUserId && row.recipient_id !== otherUserId) return;
         if (seenIds.current.has(row.id)) return;
         seenIds.current.add(row.id);
         setMessages((prev) => [...prev, row]);
       });
-      return unsubscribe;
+      // Live-update likes (and any other field changes) on existing messages.
+      const unsubUpdate = subscribeToMyMessageUpdates(myUserId, (row) => {
+        if (row.sender_id !== otherUserId && row.recipient_id !== otherUserId) return;
+        setMessages((prev) => prev.map((m) => (m.id === row.id ? { ...m, ...row } : m)));
+      });
+      return () => { unsubInsert(); unsubUpdate(); };
     }, [fetchAll, myUserId, otherUserId])
   );
 
