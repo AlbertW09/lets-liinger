@@ -5,9 +5,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AvatarBubble } from '@/components/avatar-bubble';
 import { EventFormInitialValues, EventFormModal, EventFormSubmitValues } from '@/components/event-form-modal';
 import { ThemedText } from '@/components/themed-text';
-import { Badge } from '@/components/ui/badge';
 import { IconButton } from '@/components/ui/icon-button';
 import { ShadowSurface } from '@/components/ui/shadow-surface';
 import { Spacing } from '@/constants/theme';
@@ -22,11 +22,13 @@ interface Comment {
   created_at: string;
   author: string;
   authorId: string;
+  authorAvatar: string | null;
 }
 
 interface Attendee {
   userId: string;
   label: string;
+  avatarUrl: string | null;
 }
 
 interface EventDetail {
@@ -37,6 +39,7 @@ interface EventDetail {
   event_time: string | null;
   hostName: string;
   hostRaw: string | null;
+  hostAvatar: string | null;
   postedBy: string;
   created_at: string | null;
   createdBy: string | null;
@@ -79,17 +82,17 @@ export default function EventDetailScreen() {
     const [eventRes, likesRes, rsvpsRes, commentsRes] = await Promise.all([
       supabase
         .from('events')
-        .select('id, title, description, location, event_time, host, created_at, created_by, latitude, longitude, creator:profiles!events_created_by_fkey(username, display_name)')
+        .select('id, title, description, location, event_time, host, created_at, created_by, latitude, longitude, creator:profiles!events_created_by_fkey(username, display_name, avatar_url)')
         .eq('id', id)
         .single(),
       supabase.from('event_likes').select('user_id').eq('event_id', id),
       supabase
         .from('rsvps')
-        .select('user_id, profile:profiles!rsvps_user_id_fkey(username, display_name)')
+        .select('user_id, profile:profiles!rsvps_user_id_fkey(username, display_name, avatar_url)')
         .eq('event_id', id),
       supabase
         .from('event_comments')
-        .select('id, content, created_at, user_id, author:profiles!event_comments_user_id_fkey(username, display_name)')
+        .select('id, content, created_at, user_id, author:profiles!event_comments_user_id_fkey(username, display_name, avatar_url)')
         .eq('event_id', id)
         .order('created_at', { ascending: true }),
     ]);
@@ -106,6 +109,7 @@ export default function EventDetailScreen() {
           ? e.host
           : e.creator?.username ? `@${e.creator.username}` : e.creator?.display_name ?? 'Someone',
         hostRaw: e.host ?? null,
+        hostAvatar: e.creator?.avatar_url ?? null,
         postedBy: e.creator?.username ? `@${e.creator.username}` : e.creator?.display_name ?? 'someone',
         created_at: e.created_at,
         createdBy: e.created_by ?? null,
@@ -123,6 +127,7 @@ export default function EventDetailScreen() {
       .map((r: any) => ({
         userId: r.user_id,
         label: r.profile?.username ? `@${r.profile.username}` : r.profile?.display_name,
+        avatarUrl: r.profile?.avatar_url ?? null,
       }))
       .filter((r) => !!r.label);
     setRsvpers(attendees);
@@ -143,6 +148,7 @@ export default function EventDetailScreen() {
         created_at: c.created_at,
         authorId: c.user_id,
         author: c.author?.username ? `@${c.author.username}` : c.author?.display_name ?? 'Someone',
+        authorAvatar: c.author?.avatar_url ?? null,
       }))
     );
 
@@ -322,13 +328,15 @@ export default function EventDetailScreen() {
           <ThemedText style={styles.title}>{event.title}</ThemedText>
           <View style={styles.metaRow}>
             <ThemedText style={styles.metaLabel}>HOSTED BY:</ThemedText>
-            {event.createdBy && event.createdBy !== userId ? (
-              <TouchableOpacity onPress={() => router.push(`/user?id=${event.createdBy}`)}>
-                <ThemedText style={styles.metaValue}>{event.hostName}</ThemedText>
-              </TouchableOpacity>
-            ) : (
+            <TouchableOpacity
+              style={styles.hostChip}
+              onPress={() => event.createdBy && router.push(`/user?id=${event.createdBy}`)}
+              disabled={!event.createdBy || event.createdBy === userId}
+              activeOpacity={0.7}
+            >
+              <AvatarBubble url={event.hostAvatar} name={event.hostName} size={24} />
               <ThemedText style={styles.metaValue}>{event.hostName}</ThemedText>
-            )}
+            </TouchableOpacity>
           </View>
 
           {!!event.description && (
@@ -376,29 +384,23 @@ export default function EventDetailScreen() {
           </View>
         </ShadowSurface>
 
-        <ThemedText style={styles.sectionTitle}>WHO'S GOING ({rsvpers.length})</ThemedText>
+        <ThemedText style={styles.sectionTitle}>WHO&apos;S GOING ({rsvpers.length})</ThemedText>
         {rsvpers.length === 0 ? (
           <ThemedText style={styles.noteText} themeColor="textSecondary">No RSVPs yet — be the first!</ThemedText>
         ) : (
           <View style={styles.rsvpWrap}>
-            {rsvpers.map((r) => {
-              const badge = (
-                <Badge
-                  label={r.label}
-                  backgroundColor={colors.accentGreen}
-                  radius={999}
-                  style={styles.rsvpBadge}
-                  textStyle={styles.rsvpBadgeText}
-                />
-              );
-              return r.userId === userId ? (
-                <View key={r.userId}>{badge}</View>
-              ) : (
-                <TouchableOpacity key={r.userId} onPress={() => router.push(`/user?id=${r.userId}`)}>
-                  {badge}
-                </TouchableOpacity>
-              );
-            })}
+            {rsvpers.map((r) => (
+              <TouchableOpacity
+                key={r.userId}
+                style={[styles.rsvpChip, { backgroundColor: colors.accentGreen, borderColor: colors.border }]}
+                onPress={() => r.userId !== userId && router.push(`/user?id=${r.userId}`)}
+                disabled={r.userId === userId}
+                activeOpacity={0.7}
+              >
+                <AvatarBubble url={r.avatarUrl} name={r.label} size={22} />
+                <ThemedText style={styles.rsvpChipText}>{r.label}</ThemedText>
+              </TouchableOpacity>
+            ))}
           </View>
         )}
 
@@ -425,19 +427,26 @@ export default function EventDetailScreen() {
         {comments.length === 0 ? (
           <ThemedText style={styles.noteText} themeColor="textSecondary">No comments yet. Start the conversation!</ThemedText>
         ) : (
-          comments.map((c) => (
-            <View key={c.id} style={dynamicStyles.commentCard}>
-              {c.authorId === userId ? (
-                <ThemedText style={styles.commentAuthor}>{c.author}</ThemedText>
-              ) : (
-                <TouchableOpacity onPress={() => router.push(`/user?id=${c.authorId}`)}>
-                  <ThemedText style={styles.commentAuthor}>{c.author}</ThemedText>
-                </TouchableOpacity>
-              )}
-              <ThemedText style={styles.commentText}>{c.content}</ThemedText>
-              <ThemedText style={styles.commentTime} themeColor="textSecondary">{formatEventTime(c.created_at)}</ThemedText>
-            </View>
-          ))
+          comments.map((c) => {
+            const isMe = c.authorId === userId;
+            const openUser = () => !isMe && router.push(`/user?id=${c.authorId}`);
+            return (
+              <View key={c.id} style={dynamicStyles.commentCard}>
+                <View style={styles.commentTopRow}>
+                  <TouchableOpacity onPress={openUser} disabled={isMe} activeOpacity={0.7}>
+                    <AvatarBubble url={c.authorAvatar} name={c.author} size={34} />
+                  </TouchableOpacity>
+                  <View style={styles.commentBody}>
+                    <TouchableOpacity onPress={openUser} disabled={isMe} activeOpacity={0.7}>
+                      <ThemedText style={styles.commentAuthor}>{c.author}</ThemedText>
+                    </TouchableOpacity>
+                    <ThemedText style={styles.commentText}>{c.content}</ThemedText>
+                    <ThemedText style={styles.commentTime} themeColor="textSecondary">{formatEventTime(c.created_at)}</ThemedText>
+                  </View>
+                </View>
+              </View>
+            );
+          })
         )}
       </ScrollView>
 
@@ -447,7 +456,7 @@ export default function EventDetailScreen() {
           <View style={dynamicStyles.deleteCard}>
             <ThemedText style={styles.deleteTitle}>Delete this event?</ThemedText>
             <ThemedText style={styles.deleteBody} themeColor="textSecondary">
-              This can't be undone. RSVPs, likes, and comments will be gone too.
+              This can&apos;t be undone. RSVPs, likes, and comments will be gone too.
             </ThemedText>
             {deleteError ? <ThemedText style={styles.error}>{deleteError}</ThemedText> : null}
             <View style={styles.deleteActions}>
@@ -529,6 +538,7 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one, marginBottom: Spacing.two },
   metaLabel: { fontSize: 11, fontWeight: 'bold', opacity: 0.6 },
   metaValue: { fontSize: 12, fontWeight: '900' },
+  hostChip: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
   description: { fontSize: 14, fontWeight: '600', marginBottom: Spacing.three, lineHeight: 20 },
   detailItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one, marginBottom: Spacing.one },
   detailEmoji: { fontSize: 16 },
@@ -541,9 +551,11 @@ const styles = StyleSheet.create({
   sectionTitle: { fontWeight: '900', fontSize: 16, letterSpacing: 0.5, marginTop: Spacing.two, marginBottom: Spacing.two },
   noteText: { fontSize: 13, fontWeight: '600', marginBottom: Spacing.three },
   rsvpWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, marginBottom: Spacing.three },
-  rsvpBadge: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.one },
-  rsvpBadgeText: { fontSize: 12 },
+  rsvpChip: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one, borderWidth: 2, borderRadius: 999, paddingLeft: 3, paddingRight: Spacing.two, paddingVertical: 3 },
+  rsvpChipText: { fontSize: 12, fontWeight: '900', color: '#000' },
   commentRow: { flexDirection: 'row', gap: Spacing.two, marginBottom: Spacing.three },
+  commentTopRow: { flexDirection: 'row', gap: Spacing.two, alignItems: 'flex-start' },
+  commentBody: { flex: 1 },
   commentAuthor: { fontSize: 13, fontWeight: '900', marginBottom: 2 },
   commentText: { fontSize: 14, fontWeight: '500', lineHeight: 19 },
   commentTime: { fontSize: 10, fontWeight: '600', marginTop: Spacing.one },
